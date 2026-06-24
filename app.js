@@ -104,195 +104,6 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function sentenceCase(value) {
-  const clean = value.trim();
-  return clean.charAt(0).toUpperCase() + clean.slice(1);
-}
-
-function checkExperimentLogic(goal) {
-  const lower = goal.toLowerCase();
-  const impossibleScale = /planet|orbit|solar system|galaxy|star|black hole|comet|asteroid/.test(lower);
-  const observationOnly = /trajectory|formation|history|origin|evolution|location|distance|mass|age/.test(lower);
-  const hasExperimentSignal = /test|compare|measure|investigate|explore|evaluate|observe|vary|effect|affect|impact|change|longer|faster|slower|growth|temperature|distance|absorb|retain/.test(lower);
-
-  if (impossibleScale && observationOnly) {
-    return {
-      valid: false,
-      reason: "This goal is better framed as astronomy observation or modeling, not a classroom experiment with a manipulable variable.",
-      suggestion: "Reframe it as a model-based experiment, such as testing how starting angle or launch speed affects the path of a marble or ball in a classroom-scale orbit model.",
-    };
-  }
-
-  if (!hasExperimentSignal) {
-    return {
-      valid: false,
-      reason: "The goal does not describe a measurable comparison, variable, or outcome the agents can evaluate as an experiment.",
-      suggestion: "Rewrite it as a testable question with one changed variable and one measurable result.",
-    };
-  }
-
-  return {
-    valid: true,
-    reason: "The goal can be reviewed as a testable classroom experiment.",
-  };
-}
-
-function identifySafetyProfile(goal) {
-  const lower = goal.toLowerCase();
-  const rejectRules = [
-    { pattern: /high[- ]?voltage|electrocution|mains electricity|tesla coil|visible arcs?|power supply/, label: "high voltage" },
-    { pattern: /explosive|explosion|detonation|gunpowder|firework|rocket fuel|propellant/, label: "explosives or energetic materials" },
-    { pattern: /hazardous (material|substance|chemical)|toxic material|toxic substance|strong acid|strong base|cyanide|mercury|chlorine gas|toxic gas|poison/, label: "hazardous materials or chemicals" },
-    { pattern: /pathogen|virus|bacteria|mold|blood|bodily fluid|biological agent|culture unknown microbes/, label: "biological agents" },
-    { pattern: /open flame|torch|combustion|burning|boiling oil|high heat|furnace/, label: "high heat" },
-    { pattern: /animal testing|human subject|medical treatment|drug|illegal/, label: "regulated or illegal activity" },
-  ];
-  const modifyRules = [
-    { pattern: /warm water|hot water|heat|temperature|yeast|baker'?s yeast|vinegar|baking soda|salt|sugar|caffeine|magnet|sharp|scissors/, label: "minor classroom hazard" },
-    { pattern: /unknown water sample|outdoor sample|pond water|stream water|river water|lake water|soil sample|food handling|allergen|peanut|tree nut/, label: "materials that need handling controls" },
-  ];
-  const rejectMatch = rejectRules.find((rule) => rule.pattern.test(lower));
-  const modifyMatch = modifyRules.find((rule) => rule.pattern.test(lower));
-
-  if (rejectMatch) return { risk: "hazardous", trigger: rejectMatch.label };
-  if (modifyMatch) return { risk: "minor", trigger: modifyMatch.label };
-  return { risk: "household", trigger: "household materials only" };
-}
-
-function inferStudyType(goal) {
-  const lower = goal.toLowerCase();
-
-  if (/plant|seed|soil|water quality|germination|growth/.test(lower)) {
-    return {
-      variable: "environmental condition",
-      measurement: "growth, visible change, or count data",
-      materials: ["household containers", "labels", "measuring tool", "observation sheet", "teacher-approved samples"],
-    };
-  }
-
-  if (/temperature|insulat|heat loss|warm|cool/.test(lower)) {
-    return {
-      variable: "material or temperature condition",
-      measurement: "temperature readings over time",
-      materials: ["cups", "thermometer", "timer", "household insulating materials", "data table"],
-    };
-  }
-
-  if (/light|color|sound|motion|force|friction|magnet/.test(lower)) {
-    return {
-      variable: "physical condition",
-      measurement: "repeatable observations or simple measurements",
-      materials: ["classroom-safe test objects", "ruler or timer", "labels", "data table"],
-    };
-  }
-
-  return {
-    variable: "one controlled variable",
-    measurement: "repeatable observations and simple measurements",
-    materials: ["household or classroom-safe materials", "labels", "measuring tool", "observation sheet"],
-  };
-}
-
-function inferProposal(goal, cost) {
-  const safetyProfile = identifySafetyProfile(goal);
-  const studyType = inferStudyType(goal);
-  const objectiveGoal = sentenceCase(goal.replace(/[.?!]+$/, ""));
-  const hazardous = safetyProfile.risk === "hazardous";
-
-  return {
-    objective: objectiveGoal,
-    hypothesis: `If students vary ${studyType.variable}, then ${studyType.measurement} will show whether the goal is supported by evidence.`,
-    materials: hazardous
-      ? ["Materials withheld pending safety review", "non-hazardous simulation or teacher-approved substitute", "observation sheet"]
-      : studyType.materials,
-    methodology: hazardous
-      ? "Do not run the proposed activity as written. Convert the goal into a non-hazardous simulation, demonstration video analysis, or teacher-approved substitute before any classroom use."
-      : "Set up a small controlled comparison, change one variable at a time, collect repeated observations, and summarize results in a table or chart.",
-    outcomes: "Students practice hypothesis formation, controls, measurement, evidence-based explanation, and responsible review of safety and resource constraints.",
-    cost,
-    risk: safetyProfile.risk,
-    safetyTrigger: safetyProfile.trigger,
-  };
-}
-
-function reviewSafety(proposal) {
-  if (proposal.risk === "hazardous") {
-    return {
-      decision: "REJECT",
-      reason: `The proposal appears to involve ${proposal.safetyTrigger}. Classroom instructions are not allowed for that risk category.`,
-      requirements: ["Replace with a non-hazardous simulation, video analysis, or teacher-approved substitute."],
-    };
-  }
-
-  if (proposal.risk === "minor") {
-    return {
-      decision: "MODIFY",
-      reason: `The proposal is mostly classroom-safe but includes ${proposal.safetyTrigger}, so it needs tighter controls.`,
-      requirements: ["Add teacher supervision, small quantities, cleanup, labeling, and handwashing or handling procedures as appropriate."],
-    };
-  }
-
-  return {
-    decision: "APPROVE",
-    reason: "Materials are household-level and the procedure avoids dangerous heat, voltage, chemicals, and biological agents.",
-    requirements: ["Keep quantities small and supervise measurements."],
-  };
-}
-
-function reviewBudget(proposal, policy) {
-  if (proposal.cost >= policy.rejectAt) {
-    return {
-      decision: "REJECT",
-      reason: `Estimated cost is $${proposal.cost.toLocaleString()}, which meets or exceeds the $${policy.rejectAt.toLocaleString()} rejection threshold.`,
-      requirements: ["Choose a lower-cost research design."],
-    };
-  }
-
-  if (proposal.cost > policy.approveMax) {
-    return {
-      decision: "MODIFY",
-      reason: `Estimated cost is $${proposal.cost.toLocaleString()}, above the $${policy.approveMax.toLocaleString()} approval limit and below the $${policy.rejectAt.toLocaleString()} rejection threshold.`,
-      requirements: ["Reduce equipment, reuse existing materials, or narrow the scope."],
-    };
-  }
-
-  return {
-    decision: "APPROVE",
-    reason: `Estimated cost is $${proposal.cost.toLocaleString()}, within the $${policy.approveMax.toLocaleString()} approval threshold.`,
-    requirements: ["Track actual expenses against the estimate."],
-  };
-}
-
-function evaluateReviews(safety, budget) {
-  const decisions = [safety.decision, budget.decision];
-
-  if (decisions.includes("REJECT")) {
-    return {
-      decision: "REJECTED",
-      explanation: "At least one required reviewer rejected the proposal, so the orchestrator cannot approve or modify it.",
-    };
-  }
-
-  if (decisions.includes("MODIFY")) {
-    return {
-      decision: "MODIFY",
-      explanation: "At least one required reviewer requested changes. Required changes must be addressed before approval.",
-    };
-  }
-
-  if (new Set(decisions).size > 1) {
-    return {
-      decision: "HUMAN REVIEW",
-      explanation: "Reviewer decisions conflict in a way the policy cannot safely resolve automatically.",
-    };
-  }
-
-  return {
-    decision: "APPROVED",
-    explanation: "Both required reviewers approved the proposal.",
-  };
-}
-
 function renderProposal(proposal) {
   outputs.proposal.className = "";
   outputs.proposal.innerHTML = `
@@ -320,32 +131,44 @@ function renderReview(target, review) {
   `;
 }
 
-function renderDecision(result, safety, budget) {
-  const decisionClass = result.decision === "APPROVED"
+function renderDecision(result) {
+  const decisionClass = result.finalDecision === "APPROVED"
     ? "approved"
-    : result.decision === "REJECTED"
+    : result.finalDecision === "REJECTED"
       ? "rejected"
-      : result.decision === "MODIFY"
+      : result.finalDecision === "MODIFY"
         ? "modify"
-        : "human";
+        : result.finalDecision === "INVALID GOAL"
+          ? "invalid"
+          : "human";
 
-  outputs.decisionTitle.textContent = `Final Decision: ${result.decision}`;
-  outputs.decisionBadge.textContent = result.decision;
+  outputs.decisionTitle.textContent = result.finalDecision === "INVALID GOAL"
+    ? "Experiment Logic Check: Invalid Goal"
+    : `Final Decision: ${result.finalDecision}`;
+  outputs.decisionBadge.textContent = result.finalDecision === "INVALID GOAL" ? "INVALID" : result.finalDecision;
   outputs.decisionBadge.className = `decision-badge ${decisionClass}`;
   outputs.decision.className = "";
+
+  const safetyBasis = result.safetyReview
+    ? `<div><dt>Safety basis</dt><dd>${escapeHtml(result.safetyReview.reason)}</dd></div>`
+    : "";
+  const budgetBasis = result.budgetReview
+    ? `<div><dt>Budget basis</dt><dd>${escapeHtml(result.budgetReview.reason)}</dd></div>`
+    : "";
+
   outputs.decision.innerHTML = `
     <dl class="detail-list">
-      <div><dt>Final Decision</dt><dd><strong>${result.decision}</strong></dd></div>
+      <div><dt>Final Decision</dt><dd><strong>${escapeHtml(result.finalDecision)}</strong></dd></div>
       <div><dt>Explanation</dt><dd>${escapeHtml(result.explanation)}</dd></div>
-      <div><dt>Safety basis</dt><dd>${escapeHtml(safety.reason)}</dd></div>
-      <div><dt>Budget basis</dt><dd>${escapeHtml(budget.reason)}</dd></div>
+      ${safetyBasis}
+      ${budgetBasis}
     </dl>
   `;
 }
 
-function renderInvalidGoal(goal, logicCheck) {
+function renderInvalidGoal(result) {
   resetState();
-  outputs.goal.textContent = goal;
+  outputs.goal.textContent = result.goal;
   outputs.goal.className = "";
   outputs.decisionTitle.textContent = "Experiment Logic Check: Invalid Goal";
   outputs.decisionBadge.textContent = "INVALID";
@@ -354,56 +177,84 @@ function renderInvalidGoal(goal, logicCheck) {
   outputs.proposal.innerHTML = `
     <dl class="detail-list">
       <div><dt>Logic check</dt><dd>Not a valid classroom experiment for this workflow.</dd></div>
-      <div><dt>Reason</dt><dd>${escapeHtml(logicCheck.reason)}</dd></div>
-      <div><dt>Try this</dt><dd>${escapeHtml(logicCheck.suggestion)}</dd></div>
+      <div><dt>Reason</dt><dd>${escapeHtml(result.logicCheck.reason)}</dd></div>
+      <div><dt>Try this</dt><dd>${escapeHtml(result.logicCheck.suggestion)}</dd></div>
     </dl>
   `;
-  outputs.decision.className = "";
-  outputs.decision.innerHTML = `
-    <dl class="detail-list">
-      <div><dt>Final Decision</dt><dd><strong>INVALID GOAL</strong></dd></div>
-      <div><dt>Explanation</dt><dd>${escapeHtml(logicCheck.reason)}</dd></div>
-    </dl>
-  `;
-  addAudit(`Experiment logic check failed. ${logicCheck.reason}`);
+  renderDecision(result);
+  result.audit.forEach(addAudit);
+}
+
+async function callOrchestrator(goal, cost, budgetPolicy) {
+  const response = await fetch("/api/orchestrate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ goal, cost, budgetPolicy }),
+  });
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || "The Python orchestrator could not process this request.");
+  }
+
+  return result;
 }
 
 async function runOrchestration(goal, cost, budgetPolicy) {
   resetState();
   outputs.goal.textContent = goal;
   outputs.goal.className = "";
-  outputs.decisionTitle.textContent = "Agents are evaluating the proposal";
+  outputs.decisionTitle.textContent = "Calling Python agents";
   addAudit(`Research goal received: ${goal}`);
-  addAudit("Experiment logic check passed. The goal is valid for this classroom workflow.");
 
+  let result;
+  try {
+    result = await callOrchestrator(goal, cost, budgetPolicy);
+  } catch (error) {
+    outputs.decisionTitle.textContent = "Python orchestrator unavailable";
+    outputs.decisionBadge.textContent = "ERROR";
+    outputs.decisionBadge.className = "decision-badge rejected";
+    outputs.decision.className = "";
+    outputs.decision.innerHTML = `
+      <dl class="detail-list">
+        <div><dt>Error</dt><dd>${escapeHtml(error.message)}</dd></div>
+        <div><dt>Local run</dt><dd>Use python3 server.py so the /api/orchestrate endpoint is available.</dd></div>
+      </dl>
+    `;
+    addAudit(`Python orchestrator error: ${error.message}`);
+    return;
+  }
+
+  if (result.status === "invalid") {
+    renderInvalidGoal(result);
+    return;
+  }
+
+  addAudit("Experiment logic check passed. The goal is valid for this classroom workflow.");
   setCardState(cards.scientist, "active", "Drafting");
   addAudit("Scientist Agent assigned to create objective, hypothesis, materials, methodology, outcomes, and learning outcomes from the submitted goal.");
   await wait(650);
-  const proposal = inferProposal(goal, cost);
-  renderProposal(proposal);
+  renderProposal(result.proposal);
   setCardState(cards.scientist, "done", "Proposal ready");
-  addAudit(`Scientist Agent produced proposal with estimated cost $${proposal.cost.toLocaleString()} and risk category ${proposal.risk}.`);
+  addAudit(`Scientist Agent produced proposal with estimated cost $${result.proposal.cost.toLocaleString()} and risk category ${result.proposal.risk}.`);
 
   setCardState(cards.safety, "active", "Reviewing");
   addAudit("Proposal sent to Lab Safety Officer Agent.");
   await wait(650);
-  const safety = reviewSafety(proposal);
-  renderReview(outputs.safety, safety);
-  setCardState(cards.safety, safety.decision === "REJECT" ? "danger" : safety.decision === "MODIFY" ? "warning" : "done", safety.decision);
-  addAudit(`Lab Safety Officer decision: ${safety.decision}. ${safety.reason}`);
+  renderReview(outputs.safety, result.safetyReview);
+  setCardState(cards.safety, result.safetyReview.decision === "REJECT" ? "danger" : result.safetyReview.decision === "MODIFY" ? "warning" : "done", result.safetyReview.decision);
+  addAudit(`Lab Safety Officer decision: ${result.safetyReview.decision}. ${result.safetyReview.reason}`);
 
   setCardState(cards.budget, "active", "Reviewing");
   addAudit("Proposal sent to Budget Analyst Agent.");
   await wait(650);
-  const budget = reviewBudget(proposal, budgetPolicy);
-  renderReview(outputs.budget, budget);
-  setCardState(cards.budget, budget.decision === "REJECT" ? "danger" : budget.decision === "MODIFY" ? "warning" : "done", budget.decision);
-  addAudit(`Budget Analyst decision: ${budget.decision}. ${budget.reason}`);
+  renderReview(outputs.budget, result.budgetReview);
+  setCardState(cards.budget, result.budgetReview.decision === "REJECT" ? "danger" : result.budgetReview.decision === "MODIFY" ? "warning" : "done", result.budgetReview.decision);
+  addAudit(`Budget Analyst decision: ${result.budgetReview.decision}. ${result.budgetReview.reason}`);
 
   await wait(400);
-  const result = evaluateReviews(safety, budget);
-  renderDecision(result, safety, budget);
-  addAudit(`Orchestrator final decision: ${result.decision}. ${result.explanation}`);
+  renderDecision(result);
+  addAudit(`Orchestrator final decision: ${result.finalDecision}. ${result.explanation}`);
 }
 
 form.addEventListener("submit", (event) => {
@@ -428,12 +279,6 @@ form.addEventListener("submit", (event) => {
   if (!budgetPolicy) {
     rejectLimitInput.focus();
     addAudit("Run blocked because budget thresholds are invalid. Reject-from must be greater than approve-up-to.");
-    return;
-  }
-
-  const logicCheck = checkExperimentLogic(goal);
-  if (!logicCheck.valid) {
-    renderInvalidGoal(goal, logicCheck);
     return;
   }
 

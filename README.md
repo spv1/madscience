@@ -11,7 +11,7 @@ The demo is intentionally client-side and dependency-free so it can run locally,
 ## Local Run
 
 ```bash
-python3 -m http.server 4173
+python3 server.py
 ```
 
 Then open:
@@ -19,6 +19,14 @@ Then open:
 ```text
 http://127.0.0.1:4173/index.html
 ```
+
+## Python Agent Code
+
+The agent and orchestrator logic lives in:
+
+- `madscience_agents.py`: Scientist, Safety Officer, Budget Analyst, logic check, and final decision rules
+- `api/orchestrate.py`: Vercel Python API endpoint used by the browser app
+- `server.py`: local Python server for running the app and API together
 
 The presentation deck is available at:
 

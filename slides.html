@@ -117,6 +117,195 @@
         line-height: 1.35;
       }
 
+      .workflow {
+        display: grid;
+        grid-template-columns: 1fr 1.45fr;
+        gap: 24px;
+        align-items: stretch;
+      }
+
+      .prompt-card,
+      .agent-map,
+      .iteration-card,
+      .demo-link {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .prompt-card {
+        display: grid;
+        align-content: start;
+        gap: 16px;
+        padding: 22px;
+        border-left: 5px solid var(--blue);
+      }
+
+      .prompt-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: clamp(1rem, 1.8vw, 1.25rem);
+        line-height: 1.35;
+      }
+
+      .prompt-card strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: clamp(1.2rem, 2.3vw, 1.6rem);
+      }
+
+      .agent-map {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        padding: 16px;
+      }
+
+      .agent-node {
+        display: grid;
+        gap: 10px;
+        min-height: 190px;
+        border-radius: 8px;
+        padding: 16px;
+        background: #f8fafc;
+      }
+
+      .agent-node:nth-child(2) {
+        background: #f3f8f8;
+      }
+
+      .agent-node:nth-child(3) {
+        background: #fff8eb;
+      }
+
+      .agent-icon {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        background: var(--blue);
+        color: #fff;
+        font-size: 1.35rem;
+        font-weight: 900;
+      }
+
+      .agent-node:nth-child(2) .agent-icon {
+        background: var(--green);
+      }
+
+      .agent-node:nth-child(3) .agent-icon {
+        background: var(--amber);
+      }
+
+      .agent-node h3,
+      .iteration-card h3 {
+        margin: 0;
+        font-size: clamp(1rem, 1.9vw, 1.28rem);
+      }
+
+      .agent-node p,
+      .iteration-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: clamp(0.9rem, 1.6vw, 1.06rem);
+        line-height: 1.35;
+      }
+
+      .decision-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .status-chip,
+      .iteration-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 34px;
+        border-radius: 999px;
+        padding: 0 12px;
+        font-size: 0.82rem;
+        font-weight: 900;
+      }
+
+      .status-chip.approve {
+        background: rgba(33, 131, 91, 0.12);
+        color: var(--green);
+      }
+
+      .status-chip.modify,
+      .status-chip.human {
+        background: rgba(164, 97, 0, 0.14);
+        color: var(--amber);
+      }
+
+      .status-chip.reject {
+        background: rgba(186, 45, 54, 0.12);
+        color: #ba2d36;
+      }
+
+      .demo-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-top: 20px;
+        padding: 16px 18px;
+        text-decoration: none;
+        color: var(--ink);
+      }
+
+      .demo-link span {
+        color: var(--blue);
+        font-weight: 900;
+      }
+
+      .iteration-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .iteration-card {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 14px;
+        align-items: start;
+        padding: 16px;
+      }
+
+      .iteration-badge {
+        width: 42px;
+        height: 42px;
+        padding: 0;
+        border-radius: 8px;
+        background: #e8f1fb;
+        color: var(--blue);
+      }
+
+      .iteration-card:nth-child(2) .iteration-badge,
+      .iteration-card:nth-child(5) .iteration-badge {
+        background: #e9f6f1;
+        color: var(--green);
+      }
+
+      .iteration-card:nth-child(3) .iteration-badge {
+        background: #fff0d6;
+        color: var(--amber);
+      }
+
+      .iteration-card:nth-child(4) .iteration-badge {
+        background: #f9e4e7;
+        color: #ba2d36;
+      }
+
+      .iteration-card.wide {
+        grid-column: 1 / -1;
+      }
+
       li::marker {
         color: var(--blue);
         font-weight: 900;
@@ -209,6 +398,17 @@
           right: 0;
           bottom: 0;
         }
+
+        .workflow,
+        .agent-map,
+        .decision-row,
+        .iteration-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .agent-node {
+          min-height: auto;
+        }
       }
     </style>
   </head>
@@ -229,26 +429,85 @@
       <section class="slide" aria-label="Slide 2">
         <div class="slide-inner">
           <h2>Design and Implementation Steps</h2>
-          <ol>
-            <li>Define the classroom workflow: user goal, Scientist proposal, Safety review, Budget review, final decision, and audit trail.</li>
-            <li>Establish guardrails before automation: reject dangerous experiments, never override reviewer decisions, and explain every rejection or modification.</li>
-            <li>Model each agent as a clear responsibility: Scientist proposes, Safety Officer evaluates risk, Budget Analyst enforces configurable limits.</li>
-            <li>Build the user experience for presentation: simple goal entry, cost input, live agent states, policy cards, and traceable decisions.</li>
-            <li>Publish the implementation: maintain the project in the GitHub repository <code>spv1/madscience</code> and deploy the public demo on Vercel.</li>
-          </ol>
+          <div class="workflow">
+            <div class="prompt-card">
+              <p><strong>Goal In</strong>Student enters a research goal, estimated cost, and budget limits.</p>
+              <p><strong>Guardrails First</strong>Invalid goals and unsafe topics are stopped before approval.</p>
+              <p><strong>Traceable Output</strong>Every agent decision is shown in the audit trail.</p>
+            </div>
+            <div>
+              <div class="agent-map" aria-label="Agent workflow diagram">
+                <article class="agent-node">
+                  <div class="agent-icon">S</div>
+                  <h3>Scientist Agent</h3>
+                  <p>Turns the goal into objective, hypothesis, materials, method, outcomes, and cost.</p>
+                </article>
+                <article class="agent-node">
+                  <div class="agent-icon">!</div>
+                  <h3>Safety Officer</h3>
+                  <p>Checks hazards, classroom fit, and whether modifications or rejection are required.</p>
+                </article>
+                <article class="agent-node">
+                  <div class="agent-icon">$</div>
+                  <h3>Budget Analyst</h3>
+                  <p>Compares the proposal cost with configurable classroom budget thresholds.</p>
+                </article>
+              </div>
+              <div class="decision-row" aria-label="Decision outcomes">
+                <span class="status-chip approve">APPROVED</span>
+                <span class="status-chip modify">MODIFY</span>
+                <span class="status-chip reject">REJECTED</span>
+                <span class="status-chip human">INVALID</span>
+              </div>
+              <a class="demo-link" href="https://madscience-cyan.vercel.app/" target="_blank" rel="noreferrer">
+                <strong>Live Vercel Demo</strong>
+                <span>madscience-cyan.vercel.app</span>
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
       <section class="slide" aria-label="Slide 3">
         <div class="slide-inner">
           <h2>Iterative Changes</h2>
-          <ol>
-            <li>Started with fixed demo cases, then generalized proposals so new research goals keep their own topic.</li>
-            <li>Added cost input and configurable budget thresholds: default approve $0-$25, modify $26-$99, reject $100+.</li>
-            <li>Expanded safety guardrails for high voltage, hazardous materials, biological agents, explosives, and high heat.</li>
-            <li>Added an experiment logic check so non-actionable goals, such as planet trajectory studies, are marked invalid before agent review.</li>
-            <li>Tuned classroom safety: ordinary seed growth experiments can approve, while outdoor samples and unknown materials still require controls.</li>
-          </ol>
+          <div class="iteration-grid">
+            <article class="iteration-card">
+              <span class="iteration-badge">1</span>
+              <div>
+                <h3>From Scripted to Flexible</h3>
+                <p>Moved beyond fixed demo cases so new goals keep their own topic and proposal language.</p>
+              </div>
+            </article>
+            <article class="iteration-card">
+              <span class="iteration-badge">2</span>
+              <div>
+                <h3>Budget Became Configurable</h3>
+                <p>Added cost input and editable limits: approve, modify, or reject based on presenter thresholds.</p>
+              </div>
+            </article>
+            <article class="iteration-card">
+              <span class="iteration-badge">3</span>
+              <div>
+                <h3>Safety Guardrails Expanded</h3>
+                <p>Rejected high voltage, hazardous materials, biological agents, explosives, and high heat.</p>
+              </div>
+            </article>
+            <article class="iteration-card">
+              <span class="iteration-badge">4</span>
+              <div>
+                <h3>Logic Check Added</h3>
+                <p>Marked non-actionable goals, such as planet trajectory studies, invalid before agent review.</p>
+              </div>
+            </article>
+            <article class="iteration-card wide">
+              <span class="iteration-badge">5</span>
+              <div>
+                <h3>Classroom Safety Tuned</h3>
+                <p>Ordinary seed growth experiments now approve; outdoor samples and unknown materials still require controls.</p>
+              </div>
+            </article>
+          </div>
         </div>
       </section>
     </main>

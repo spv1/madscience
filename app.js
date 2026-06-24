@@ -149,7 +149,7 @@ function identifySafetyProfile(goal) {
   ];
   const modifyRules = [
     { pattern: /warm water|hot water|heat|temperature|yeast|baker'?s yeast|vinegar|baking soda|salt|sugar|caffeine|magnet|sharp|scissors/, label: "minor classroom hazard" },
-    { pattern: /plant|seed|soil|water sample|food|allergen|outdoor sample/, label: "materials that need handling controls" },
+    { pattern: /unknown water sample|outdoor sample|pond water|stream water|river water|lake water|soil sample|food handling|allergen|peanut|tree nut/, label: "materials that need handling controls" },
   ];
   const rejectMatch = rejectRules.find((rule) => rule.pattern.test(lower));
   const modifyMatch = modifyRules.find((rule) => rule.pattern.test(lower));

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Applied Agentic AI Course - Student Demo</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #111827;
+        --muted: #5b6775;
+        --line: #d7dee8;
+        --blue: #2364aa;
+        --green: #21835b;
+        --amber: #a46100;
+        --paper: #f7f9fb;
+        --panel: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        overflow: hidden;
+        background:
+          linear-gradient(120deg, rgba(35, 100, 170, 0.12), transparent 38%),
+          linear-gradient(240deg, rgba(33, 131, 91, 0.12), transparent 34%),
+          var(--paper);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .deck {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .slide {
+        position: absolute;
+        inset: 0;
+        display: none;
+        padding: clamp(28px, 6vw, 72px);
+      }
+
+      .slide.active {
+        display: grid;
+      }
+
+      .slide-inner {
+        display: grid;
+        align-content: center;
+        width: min(1120px, 100%);
+        min-height: min(720px, calc(100vh - 120px));
+        margin: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: clamp(28px, 5vw, 64px);
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 22px 60px rgba(31, 44, 59, 0.14);
+      }
+
+      .title-slide .slide-inner {
+        justify-items: start;
+        gap: 22px;
+      }
+
+      .eyebrow {
+        margin: 0;
+        color: var(--green);
+        font-size: clamp(0.82rem, 1.5vw, 1rem);
+        font-weight: 900;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        max-width: 920px;
+        margin: 0;
+        font-size: clamp(2.6rem, 7vw, 5.8rem);
+        line-height: 0.96;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin: 0 0 22px;
+        font-size: clamp(2rem, 4.8vw, 4rem);
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: var(--blue);
+        font-size: clamp(1.35rem, 3vw, 2.3rem);
+        font-weight: 850;
+      }
+
+      .meta {
+        display: grid;
+        gap: 6px;
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: clamp(1.05rem, 2.2vw, 1.45rem);
+        font-weight: 700;
+      }
+
+      ol {
+        display: grid;
+        gap: clamp(12px, 2vh, 18px);
+        margin: 0;
+        padding-left: 1.4em;
+        font-size: clamp(1.05rem, 2.2vw, 1.55rem);
+        line-height: 1.35;
+      }
+
+      li::marker {
+        color: var(--blue);
+        font-weight: 900;
+      }
+
+      strong,
+      code {
+        color: var(--blue);
+      }
+
+      code {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.08em 0.28em;
+        background: #f1f5f9;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 0.86em;
+      }
+
+      .progress {
+        position: fixed;
+        left: 24px;
+        right: 24px;
+        bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        color: var(--muted);
+        font-size: 0.92rem;
+        font-weight: 800;
+      }
+
+      .dots {
+        display: flex;
+        gap: 8px;
+      }
+
+      .dot {
+        width: 34px;
+        height: 6px;
+        border-radius: 999px;
+        background: #cbd5e1;
+      }
+
+      .dot.active {
+        background: var(--amber);
+      }
+
+      .nav {
+        display: flex;
+        gap: 8px;
+      }
+
+      button {
+        min-height: 36px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0 12px;
+        background: var(--panel);
+        color: var(--ink);
+        font: inherit;
+        font-weight: 850;
+        cursor: pointer;
+      }
+
+      @media (max-width: 720px) {
+        body {
+          overflow: auto;
+        }
+
+        .deck {
+          min-height: 100vh;
+          height: auto;
+        }
+
+        .slide {
+          min-height: 100vh;
+          padding: 16px;
+        }
+
+        .slide-inner {
+          min-height: calc(100vh - 72px);
+        }
+
+        .progress {
+          position: sticky;
+          padding: 0 16px 14px;
+          left: 0;
+          right: 0;
+          bottom: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck" aria-live="polite">
+      <section class="slide title-slide active" aria-label="Slide 1">
+        <div class="slide-inner">
+          <p class="eyebrow">Student Demo</p>
+          <h1>Applied Agentic AI Course - Student Demo</h1>
+          <p class="subtitle">MadScience Experiments</p>
+          <div class="meta">
+            <span>by Naresh Raheja</span>
+            <span>June 25, 2026</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" aria-label="Slide 2">
+        <div class="slide-inner">
+          <h2>Design and Implementation Steps</h2>
+          <ol>
+            <li>Define the classroom workflow: user goal, Scientist proposal, Safety review, Budget review, final decision, and audit trail.</li>
+            <li>Establish guardrails before automation: reject dangerous experiments, never override reviewer decisions, and explain every rejection or modification.</li>
+            <li>Model each agent as a clear responsibility: Scientist proposes, Safety Officer evaluates risk, Budget Analyst enforces configurable limits.</li>
+            <li>Build the user experience for presentation: simple goal entry, cost input, live agent states, policy cards, and traceable decisions.</li>
+            <li>Publish the implementation: maintain the project in the GitHub repository <code>spv1/madscience</code> and deploy the public demo on Vercel.</li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="slide" aria-label="Slide 3">
+        <div class="slide-inner">
+          <h2>Iterative Changes</h2>
+          <ol>
+            <li>Started with fixed demo cases, then generalized proposals so new research goals keep their own topic.</li>
+            <li>Added cost input and configurable budget thresholds: default approve $0-$25, modify $26-$99, reject $100+.</li>
+            <li>Expanded safety guardrails for high voltage, hazardous materials, biological agents, explosives, and high heat.</li>
+            <li>Added an experiment logic check so non-actionable goals, such as planet trajectory studies, are marked invalid before agent review.</li>
+            <li>Tuned classroom safety: ordinary seed growth experiments can approve, while outdoor samples and unknown materials still require controls.</li>
+          </ol>
+        </div>
+      </section>
+    </main>
+
+    <footer class="progress">
+      <div class="dots" aria-hidden="true">
+        <span class="dot active"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
+      <div class="nav">
+        <button id="prevButton" type="button">Previous</button>
+        <button id="nextButton" type="button">Next</button>
+      </div>
+    </footer>
+
+    <script>
+      const slides = Array.from(document.querySelectorAll(".slide"));
+      const dots = Array.from(document.querySelectorAll(".dot"));
+      const prevButton = document.querySelector("#prevButton");
+      const nextButton = document.querySelector("#nextButton");
+      let current = 0;
+
+      function showSlide(index) {
+        current = Math.max(0, Math.min(slides.length - 1, index));
+        slides.forEach((slide, slideIndex) => {
+          slide.classList.toggle("active", slideIndex === current);
+        });
+        dots.forEach((dot, dotIndex) => {
+          dot.classList.toggle("active", dotIndex === current);
+        });
+        prevButton.disabled = current === 0;
+        nextButton.disabled = current === slides.length - 1;
+      }
+
+      prevButton.addEventListener("click", () => showSlide(current - 1));
+      nextButton.addEventListener("click", () => showSlide(current + 1));
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowRight" || event.key === " ") showSlide(current + 1);
+        if (event.key === "ArrowLeft") showSlide(current - 1);
+      });
+
+      showSlide(0);
+    </script>
+  </body>
+</html>

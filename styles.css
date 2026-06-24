@@ -31,6 +31,7 @@ body {
 
 button,
 input,
+a,
 textarea {
   font: inherit;
 }
@@ -253,6 +254,12 @@ textarea:focus,
   border-color: var(--line);
   background: #fff;
   color: var(--ink);
+}
+
+.deck-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }
 
 .quick-start {

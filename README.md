@@ -20,6 +20,12 @@ Then open:
 http://127.0.0.1:4173/index.html
 ```
 
+The presentation deck is available at:
+
+```text
+http://127.0.0.1:4173/slides.html
+```
+
 ## Policies
 
 Budget defaults:

@@ -32,4 +32,4 @@ Safety:
 
 - Household materials only: approve
 - Minor classroom hazards: modify
-- Hazardous chemicals, biological agents, explosives, high voltage, high heat, illegal, or regulated activity: reject
+- Hazardous materials, hazardous chemicals, biological agents, explosives, high voltage, high heat, illegal, or regulated activity: reject

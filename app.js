@@ -81,7 +81,7 @@ function identifySafetyProfile(goal) {
   const rejectRules = [
     { pattern: /high[- ]?voltage|electrocution|mains electricity|tesla coil|visible arcs?|power supply/, label: "high voltage" },
     { pattern: /explosive|explosion|detonation|gunpowder|firework|rocket fuel|propellant/, label: "explosives or energetic materials" },
-    { pattern: /hazardous chemical|strong acid|strong base|cyanide|mercury|chlorine gas|toxic gas|poison/, label: "hazardous chemicals" },
+    { pattern: /hazardous (material|substance|chemical)|toxic material|toxic substance|strong acid|strong base|cyanide|mercury|chlorine gas|toxic gas|poison/, label: "hazardous materials or chemicals" },
     { pattern: /pathogen|virus|bacteria|mold|blood|bodily fluid|biological agent|culture unknown microbes/, label: "biological agents" },
     { pattern: /open flame|torch|combustion|burning|boiling oil|high heat|furnace/, label: "high heat" },
     { pattern: /animal testing|human subject|medical treatment|drug|illegal/, label: "regulated or illegal activity" },

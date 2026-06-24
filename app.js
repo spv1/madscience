@@ -1,6 +1,8 @@
 const form = document.querySelector("#goalForm");
 const goalInput = document.querySelector("#researchGoal");
 const costInput = document.querySelector("#estimatedCost");
+const approveLimitInput = document.querySelector("#approveLimit");
+const rejectLimitInput = document.querySelector("#rejectLimit");
 const resetButton = document.querySelector("#resetButton");
 const chips = document.querySelectorAll(".chip");
 const auditTrail = document.querySelector("#auditTrail");
@@ -13,6 +15,9 @@ const outputs = {
   decision: document.querySelector("#decisionOutput"),
   decisionTitle: document.querySelector("#decisionTitle"),
   decisionBadge: document.querySelector("#decisionBadge"),
+  budgetApproveText: document.querySelector("#budgetApproveText"),
+  budgetModifyText: document.querySelector("#budgetModifyText"),
+  budgetRejectText: document.querySelector("#budgetRejectText"),
 };
 
 const cards = {
@@ -62,6 +67,34 @@ function normalizeCost(cost) {
   return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
 }
 
+function getBudgetPolicy() {
+  const approveMax = normalizeCost(approveLimitInput.value);
+  const rejectAt = normalizeCost(rejectLimitInput.value);
+
+  if (approveMax === null || rejectAt === null || rejectAt <= approveMax) {
+    return null;
+  }
+
+  return { approveMax, rejectAt };
+}
+
+function renderBudgetPolicy(policy) {
+  if (!policy) {
+    outputs.budgetApproveText.innerHTML = "<strong>Approve:</strong> set valid limits";
+    outputs.budgetModifyText.innerHTML = "<strong>Modify:</strong> reject-from must be higher";
+    outputs.budgetRejectText.innerHTML = "<strong>Reject:</strong> set valid limits";
+    return;
+  }
+
+  const modifyStart = policy.approveMax + 1;
+  const modifyEnd = policy.rejectAt - 1;
+  outputs.budgetApproveText.innerHTML = `<strong>Approve:</strong> $${policy.approveMax.toLocaleString()} or less`;
+  outputs.budgetModifyText.innerHTML = modifyStart <= modifyEnd
+    ? `<strong>Modify:</strong> $${modifyStart.toLocaleString()} to $${modifyEnd.toLocaleString()}`
+    : "<strong>Modify:</strong> no middle range";
+  outputs.budgetRejectText.innerHTML = `<strong>Reject:</strong> $${policy.rejectAt.toLocaleString()} or more`;
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -74,6 +107,34 @@ function escapeHtml(value) {
 function sentenceCase(value) {
   const clean = value.trim();
   return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+function checkExperimentLogic(goal) {
+  const lower = goal.toLowerCase();
+  const impossibleScale = /planet|orbit|solar system|galaxy|star|black hole|comet|asteroid/.test(lower);
+  const observationOnly = /trajectory|formation|history|origin|evolution|location|distance|mass|age/.test(lower);
+  const hasExperimentSignal = /test|compare|measure|investigate|explore|evaluate|observe|vary|effect|affect|impact|change|longer|faster|slower|growth|temperature|distance|absorb|retain/.test(lower);
+
+  if (impossibleScale && observationOnly) {
+    return {
+      valid: false,
+      reason: "This goal is better framed as astronomy observation or modeling, not a classroom experiment with a manipulable variable.",
+      suggestion: "Reframe it as a model-based experiment, such as testing how starting angle or launch speed affects the path of a marble or ball in a classroom-scale orbit model.",
+    };
+  }
+
+  if (!hasExperimentSignal) {
+    return {
+      valid: false,
+      reason: "The goal does not describe a measurable comparison, variable, or outcome the agents can evaluate as an experiment.",
+      suggestion: "Rewrite it as a testable question with one changed variable and one measurable result.",
+    };
+  }
+
+  return {
+    valid: true,
+    reason: "The goal can be reviewed as a testable classroom experiment.",
+  };
 }
 
 function identifySafetyProfile(goal) {
@@ -178,26 +239,26 @@ function reviewSafety(proposal) {
   };
 }
 
-function reviewBudget(proposal) {
-  if (proposal.cost > 10000) {
+function reviewBudget(proposal, policy) {
+  if (proposal.cost >= policy.rejectAt) {
     return {
       decision: "REJECT",
-      reason: `Estimated cost is $${proposal.cost.toLocaleString()}, which exceeds the $10000 rejection threshold.`,
+      reason: `Estimated cost is $${proposal.cost.toLocaleString()}, which meets or exceeds the $${policy.rejectAt.toLocaleString()} rejection threshold.`,
       requirements: ["Choose a lower-cost research design."],
     };
   }
 
-  if (proposal.cost > 5000) {
+  if (proposal.cost > policy.approveMax) {
     return {
       decision: "MODIFY",
-      reason: `Estimated cost is $${proposal.cost.toLocaleString()}, which requires modification under the budget policy.`,
+      reason: `Estimated cost is $${proposal.cost.toLocaleString()}, above the $${policy.approveMax.toLocaleString()} approval limit and below the $${policy.rejectAt.toLocaleString()} rejection threshold.`,
       requirements: ["Reduce equipment, reuse existing materials, or narrow the scope."],
     };
   }
 
   return {
     decision: "APPROVE",
-    reason: `Estimated cost is $${proposal.cost.toLocaleString()}, within the $5000 approval threshold.`,
+    reason: `Estimated cost is $${proposal.cost.toLocaleString()}, within the $${policy.approveMax.toLocaleString()} approval threshold.`,
     requirements: ["Track actual expenses against the estimate."],
   };
 }
@@ -282,12 +343,38 @@ function renderDecision(result, safety, budget) {
   `;
 }
 
-async function runOrchestration(goal, cost) {
+function renderInvalidGoal(goal, logicCheck) {
+  resetState();
+  outputs.goal.textContent = goal;
+  outputs.goal.className = "";
+  outputs.decisionTitle.textContent = "Experiment Logic Check: Invalid Goal";
+  outputs.decisionBadge.textContent = "INVALID";
+  outputs.decisionBadge.className = "decision-badge invalid";
+  outputs.proposal.className = "";
+  outputs.proposal.innerHTML = `
+    <dl class="detail-list">
+      <div><dt>Logic check</dt><dd>Not a valid classroom experiment for this workflow.</dd></div>
+      <div><dt>Reason</dt><dd>${escapeHtml(logicCheck.reason)}</dd></div>
+      <div><dt>Try this</dt><dd>${escapeHtml(logicCheck.suggestion)}</dd></div>
+    </dl>
+  `;
+  outputs.decision.className = "";
+  outputs.decision.innerHTML = `
+    <dl class="detail-list">
+      <div><dt>Final Decision</dt><dd><strong>INVALID GOAL</strong></dd></div>
+      <div><dt>Explanation</dt><dd>${escapeHtml(logicCheck.reason)}</dd></div>
+    </dl>
+  `;
+  addAudit(`Experiment logic check failed. ${logicCheck.reason}`);
+}
+
+async function runOrchestration(goal, cost, budgetPolicy) {
   resetState();
   outputs.goal.textContent = goal;
   outputs.goal.className = "";
   outputs.decisionTitle.textContent = "Agents are evaluating the proposal";
   addAudit(`Research goal received: ${goal}`);
+  addAudit("Experiment logic check passed. The goal is valid for this classroom workflow.");
 
   setCardState(cards.scientist, "active", "Drafting");
   addAudit("Scientist Agent assigned to create objective, hypothesis, materials, methodology, outcomes, and learning outcomes from the submitted goal.");
@@ -308,7 +395,7 @@ async function runOrchestration(goal, cost) {
   setCardState(cards.budget, "active", "Reviewing");
   addAudit("Proposal sent to Budget Analyst Agent.");
   await wait(650);
-  const budget = reviewBudget(proposal);
+  const budget = reviewBudget(proposal, budgetPolicy);
   renderReview(outputs.budget, budget);
   setCardState(cards.budget, budget.decision === "REJECT" ? "danger" : budget.decision === "MODIFY" ? "warning" : "done", budget.decision);
   addAudit(`Budget Analyst decision: ${budget.decision}. ${budget.reason}`);
@@ -323,6 +410,8 @@ form.addEventListener("submit", (event) => {
   event.preventDefault();
   const goal = normalizeGoal(goalInput.value);
   const cost = normalizeCost(costInput.value);
+  const budgetPolicy = getBudgetPolicy();
+  renderBudgetPolicy(budgetPolicy);
 
   if (!goal) {
     goalInput.focus();
@@ -336,7 +425,19 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  runOrchestration(goal, cost);
+  if (!budgetPolicy) {
+    rejectLimitInput.focus();
+    addAudit("Run blocked because budget thresholds are invalid. Reject-from must be greater than approve-up-to.");
+    return;
+  }
+
+  const logicCheck = checkExperimentLogic(goal);
+  if (!logicCheck.valid) {
+    renderInvalidGoal(goal, logicCheck);
+    return;
+  }
+
+  runOrchestration(goal, cost, budgetPolicy);
 });
 
 resetButton.addEventListener("click", () => {
@@ -353,3 +454,11 @@ chips.forEach((chip) => {
     goalInput.focus();
   });
 });
+
+[approveLimitInput, rejectLimitInput].forEach((input) => {
+  input.addEventListener("input", () => {
+    renderBudgetPolicy(getBudgetPolicy());
+  });
+});
+
+renderBudgetPolicy(getBudgetPolicy());

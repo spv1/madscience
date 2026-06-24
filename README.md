@@ -1,4 +1,4 @@
-# AI Research Lab Orchestrator
+# MadScience Experiments
 
 A classroom-friendly agentic demo that coordinates three specialized agents:
 
@@ -22,11 +22,13 @@ http://127.0.0.1:4173/index.html
 
 ## Policies
 
-Budget:
+Budget defaults:
 
-- $5000 or less: approve
-- $5001 to $10000: modify
-- More than $10000: reject
+- $25 or less: approve
+- $26 to $99: modify
+- $100 or more: reject
+
+Presenters can change the budget thresholds in the UI before running the agents.
 
 Safety:
 

@@ -190,6 +190,26 @@ textarea:focus,
   font-weight: 800;
 }
 
+.cost-input-row.compact {
+  min-height: 36px;
+  margin-bottom: 0;
+  padding-inline: 10px;
+}
+
+.threshold-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(84px, 112px);
+  gap: 8px 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.threshold-grid label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .button-row,
 .chip-row {
   display: flex;
@@ -308,7 +328,8 @@ textarea:focus,
   color: var(--amber);
 }
 
-.decision-badge.rejected {
+.decision-badge.rejected,
+.decision-badge.invalid {
   border-color: rgba(186, 45, 54, 0.28);
   background: rgba(186, 45, 54, 0.12);
   color: var(--red);

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Research Lab Orchestrator</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="control-panel" aria-label="Research goal controls">
+        <div class="brand-row">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div>
+            <p class="eyebrow">Agentic classroom demo</p>
+            <h1>AI Research Lab Orchestrator</h1>
+          </div>
+        </div>
+
+        <form id="goalForm" class="goal-form">
+          <label for="researchGoal">Research Goal</label>
+          <textarea id="researchGoal" name="researchGoal" rows="5" placeholder="Example: Design a safe classroom experiment that shows how water quality affects plant growth."></textarea>
+
+          <label for="estimatedCost">Estimated Cost</label>
+          <div class="cost-input-row">
+            <span aria-hidden="true">$</span>
+            <input id="estimatedCost" name="estimatedCost" type="number" min="0" step="1" placeholder="250">
+          </div>
+
+          <div class="button-row">
+            <button type="submit" class="primary-button">
+              <span class="button-icon" aria-hidden="true">+</span>
+              Run Agents
+            </button>
+            <button type="button" id="resetButton" class="ghost-button">
+              Reset
+            </button>
+          </div>
+        </form>
+
+        <div class="quick-start" aria-label="Demo examples">
+          <p>Demo goals</p>
+          <div class="chip-row">
+            <button type="button" class="chip" data-cost="42" data-goal="Design a safe classroom experiment that shows how water quality affects radish seed growth.">Water quality and seeds</button>
+            <button type="button" class="chip" data-cost="65" data-goal="Explore whether different insulating materials keep a cup of warm water at a stable temperature.">Insulation comparison</button>
+            <button type="button" class="chip" data-cost="1200" data-goal="Test whether a high-voltage power supply can create visible arcs for a chemistry demonstration.">Unsafe electricity demo</button>
+            <button type="button" class="chip" data-cost="85" data-goal="Compare growth rates of yeast cultures using different sugar sources.">Biology review case</button>
+          </div>
+        </div>
+
+        <div class="policy-grid">
+          <article>
+            <h2>Safety Policy</h2>
+            <p><strong>Approve:</strong> household materials only</p>
+            <p><strong>Modify:</strong> minor hazards</p>
+            <p><strong>Reject:</strong> hazardous chemicals, biological agents, explosives, high voltage, or high heat</p>
+          </article>
+          <article>
+            <h2>Budget Policy</h2>
+            <p><strong>Approve:</strong> $5000 or less</p>
+            <p><strong>Modify:</strong> $5001 to $10000</p>
+            <p><strong>Reject:</strong> more than $10000</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="workspace" aria-live="polite">
+        <div class="topline">
+          <div>
+            <p class="eyebrow">Live orchestration</p>
+            <h2 id="decisionTitle">Ready for a research goal</h2>
+          </div>
+          <span id="decisionBadge" class="decision-badge neutral">WAITING</span>
+        </div>
+
+        <div class="agent-lane" aria-label="Agent workflow">
+          <article class="agent-card idle" id="scientistCard">
+            <div class="agent-heading">
+              <div class="agent-icon scientist" aria-hidden="true"></div>
+              <div>
+                <h3>Scientist Agent</h3>
+                <p>Designs the experiment</p>
+              </div>
+            </div>
+            <span class="status-pill">Waiting</span>
+          </article>
+
+          <article class="agent-card idle" id="safetyCard">
+            <div class="agent-heading">
+              <div class="agent-icon safety" aria-hidden="true"></div>
+              <div>
+                <h3>Lab Safety Officer</h3>
+                <p>Reviews hazards and compliance</p>
+              </div>
+            </div>
+            <span class="status-pill">Waiting</span>
+          </article>
+
+          <article class="agent-card idle" id="budgetCard">
+            <div class="agent-heading">
+              <div class="agent-icon budget" aria-hidden="true"></div>
+              <div>
+                <h3>Budget Analyst</h3>
+                <p>Checks costs and resources</p>
+              </div>
+            </div>
+            <span class="status-pill">Waiting</span>
+          </article>
+        </div>
+
+        <div class="output-grid">
+          <article class="output-panel wide">
+            <h3>Research Goal</h3>
+            <p id="goalOutput" class="placeholder">Submit a goal to begin.</p>
+          </article>
+
+          <article class="output-panel">
+            <h3>Scientist Proposal</h3>
+            <div id="proposalOutput" class="placeholder">No proposal yet.</div>
+          </article>
+
+          <article class="output-panel">
+            <h3>Safety Review</h3>
+            <div id="safetyOutput" class="placeholder">No safety review yet.</div>
+          </article>
+
+          <article class="output-panel">
+            <h3>Budget Review</h3>
+            <div id="budgetOutput" class="placeholder">No budget review yet.</div>
+          </article>
+
+          <article class="output-panel decision-panel">
+            <h3>Final Decision</h3>
+            <div id="decisionOutput" class="placeholder">Awaiting agent decisions.</div>
+          </article>
+        </div>
+      </section>
+
+      <aside class="audit-panel" aria-label="Audit trail">
+        <div class="audit-heading">
+          <p class="eyebrow">Traceability</p>
+          <h2>Audit Trail</h2>
+        </div>
+        <ol id="auditTrail" class="audit-list">
+          <li>System initialized. Guardrails loaded.</li>
+        </ol>
+      </aside>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

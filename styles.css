@@ -442,6 +442,27 @@ textarea:focus,
   background: #fbfdff;
 }
 
+.modify-action {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border: 1px solid rgba(164, 97, 0, 0.22);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(164, 97, 0, 0.07);
+}
+
+.modify-action p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.modify-action .primary-button {
+  width: fit-content;
+  background: var(--amber);
+}
+
 .placeholder {
   color: var(--muted);
 }

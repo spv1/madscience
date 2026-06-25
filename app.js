@@ -6,6 +6,8 @@ const rejectLimitInput = document.querySelector("#rejectLimit");
 const resetButton = document.querySelector("#resetButton");
 const chips = document.querySelectorAll(".chip");
 const auditTrail = document.querySelector("#auditTrail");
+let lastResult = null;
+let lastRunInputs = null;
 
 const outputs = {
   goal: document.querySelector("#goalOutput"),
@@ -56,6 +58,11 @@ function resetState() {
   setCardState(cards.scientist, "idle", "Waiting");
   setCardState(cards.safety, "idle", "Waiting");
   setCardState(cards.budget, "idle", "Waiting");
+}
+
+function resetRunMemory() {
+  lastResult = null;
+  lastRunInputs = null;
 }
 
 function normalizeGoal(goal) {
@@ -158,6 +165,17 @@ function renderDecision(result) {
   const hitlBasis = result.humanApproval?.approvalRequired
     ? `<div><dt>HITL approval</dt><dd>${escapeHtml(result.humanApproval.reason)} ${escapeHtml(result.humanApproval.requirements.join(" "))}</dd></div>`
     : "";
+  const modifyAction = result.finalDecision === "MODIFY"
+    ? `
+      <div class="modify-action">
+        <p>The orchestrator can revise the goal with the requested controls, then you can run the agents again.</p>
+        <button type="button" id="modifyProposalButton" class="primary-button">
+          <span class="button-icon" aria-hidden="true">M</span>
+          Modify Proposal
+        </button>
+      </div>
+    `
+    : "";
 
   outputs.decision.innerHTML = `
     <dl class="detail-list">
@@ -167,7 +185,108 @@ function renderDecision(result) {
       ${budgetBasis}
       ${hitlBasis}
     </dl>
+    ${modifyAction}
   `;
+}
+
+function uniqueList(items) {
+  const seen = new Set();
+  return items.map((item) => normalizeGoal(item).replace(/[.?!;:]+$/, "")).filter((item) => {
+    const clean = normalizeGoal(item).replace(/[.?!;:]+$/, "");
+    const key = clean.toLowerCase();
+    if (!clean || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function controlsForReview(review) {
+  if (!review || review.decision !== "MODIFY") return [];
+
+  const matched = String(review.matchedCriteria || "").toLowerCase();
+  const controls = [...(review.requirements || [])];
+
+  if (matched.includes("minor classroom hazard")) {
+    controls.push(
+      "use warm, not hot, materials",
+      "use small quantities",
+      "include teacher supervision",
+      "clearly label all materials",
+      "include cleanup procedures",
+      "include safe handling procedures"
+    );
+  }
+
+  if (matched.includes("outdoor") || matched.includes("unknown sample")) {
+    controls.push(
+      "use sealed containers",
+      "have the teacher handle outdoor or unknown samples",
+      "use gloves if appropriate",
+      "include cleanup procedures"
+    );
+  }
+
+  if (matched.includes("allergy") || matched.includes("food")) {
+    controls.push(
+      "avoid allergens",
+      "label materials clearly",
+      "confirm the classroom allergy policy"
+    );
+  }
+
+  if (matched.includes("llm safety")) {
+    controls.push(
+      "use only teacher-approved classroom-safe materials",
+      "state the safety controls clearly",
+      "include teacher supervision"
+    );
+  }
+
+  return uniqueList(controls);
+}
+
+function buildModifiedGoal(result) {
+  const baseGoal = normalizeGoal(lastRunInputs?.goal || result.goal || goalInput.value);
+  const safetyControls = controlsForReview(result.safetyReview);
+  const budgetControls = result.budgetReview?.decision === "MODIFY"
+    ? [
+        ...(result.budgetReview.requirements || []),
+        "reduce the scope to stay within the approval budget"
+      ]
+    : [];
+  const allControls = uniqueList([...safetyControls, ...budgetControls]);
+
+  if (!allControls.length) {
+    return baseGoal;
+  }
+
+  const suffix = ` Include these required changes: ${allControls.join("; ")}.`;
+  return /include these required changes:/i.test(baseGoal)
+    ? baseGoal.replace(/include these required changes:.*/i, suffix.trim())
+    : `${baseGoal.replace(/[.?!]+$/, "")}.${suffix}`;
+}
+
+function applyModifiedProposal() {
+  if (!lastResult || lastResult.finalDecision !== "MODIFY") {
+    addAudit("Modify Proposal is available only after a MODIFY decision.");
+    return;
+  }
+
+  const modifiedGoal = buildModifiedGoal(lastResult);
+  goalInput.value = modifiedGoal;
+
+  if (lastResult.budgetReview?.decision === "MODIFY") {
+    const policy = getBudgetPolicy();
+    if (policy) {
+      costInput.value = String(policy.approveMax);
+      addAudit(`Estimated cost adjusted to $${policy.approveMax.toLocaleString()} to satisfy the budget recommendation.`);
+    }
+  }
+
+  outputs.goal.textContent = modifiedGoal;
+  outputs.goal.className = "";
+  addAudit("Modify Proposal updated the research goal with the reviewer recommendations. Click Run Agents to re-evaluate.");
+  goalInput.focus();
 }
 
 function renderInvalidGoal(result) {
@@ -206,6 +325,8 @@ async function callOrchestrator(goal, cost, budgetPolicy) {
 
 async function runOrchestration(goal, cost, budgetPolicy) {
   resetState();
+  lastResult = null;
+  lastRunInputs = { goal, cost, budgetPolicy };
   outputs.goal.textContent = goal;
   outputs.goal.className = "";
   outputs.decisionTitle.textContent = "Calling Python agents";
@@ -230,9 +351,12 @@ async function runOrchestration(goal, cost, budgetPolicy) {
   }
 
   if (result.status === "invalid") {
+    lastResult = result;
     renderInvalidGoal(result);
     return;
   }
+
+  lastResult = result;
 
   addAudit("Experiment logic check passed. The goal is valid for this classroom workflow.");
   setCardState(cards.scientist, "active", "Drafting");
@@ -293,7 +417,14 @@ resetButton.addEventListener("click", () => {
   goalInput.value = "";
   costInput.value = "";
   resetState();
+  resetRunMemory();
   addAudit("Demo reset by presenter.");
+});
+
+outputs.decision.addEventListener("click", (event) => {
+  if (event.target.closest("#modifyProposalButton")) {
+    applyModifiedProposal();
+  }
 });
 
 chips.forEach((chip) => {

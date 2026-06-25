@@ -24,6 +24,7 @@ import json
 import os
 import re
 import hashlib
+from http.client import IncompleteRead, RemoteDisconnected
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -123,6 +124,52 @@ def get_openai_api_key() -> tuple[str, str | None]:
             return value, name
 
     return "", None
+
+
+def text_contains_any(text: str, terms: list[str]) -> bool:
+    """Return True when any term appears as plain text."""
+    return any(term in text for term in terms)
+
+
+def mitigation_controls_present(goal: str, proposal: dict[str, Any], modify_rule: CriteriaRule) -> bool:
+    """Detect whether the RAG-required mitigation categories are already included."""
+    combined = " ".join(
+        [
+            goal,
+            str(proposal.get("objective", "")),
+            " ".join(map(str, proposal.get("materials", []))),
+            str(proposal.get("methodology", "")),
+        ]
+    ).lower()
+
+    if modify_rule.label == "minor classroom hazard":
+        checks = [
+            ["teacher supervision", "supervised", "teacher-approved", "teacher approved"],
+            ["small quantities", "small quantity", "small amounts", "small amount"],
+            ["cleanup", "clean up", "clean-up"],
+            ["label", "labels", "labeling", "labelled"],
+            ["handling", "safe handling", "handle safely"],
+        ]
+        return all(text_contains_any(combined, terms) for terms in checks)
+
+    if modify_rule.label == "outdoor or unknown sample":
+        checks = [
+            ["sealed container", "sealed containers", "closed container", "closed containers"],
+            ["teacher handling", "teacher handles", "teacher supervision", "supervised"],
+            ["gloves", "glove"],
+            ["cleanup", "clean up", "clean-up"],
+        ]
+        return all(text_contains_any(combined, terms) for terms in checks)
+
+    if modify_rule.label == "allergy or food handling":
+        checks = [
+            ["avoid allergens", "no allergens", "allergen-free", "allergy policy"],
+            ["label", "labels", "labeling", "labelled"],
+            ["classroom allergy policy", "confirm allergy", "check allergy"],
+        ]
+        return all(text_contains_any(combined, terms) for terms in checks)
+
+    return False
 
 
 # ============================================================
@@ -486,7 +533,7 @@ def llm_safety_sanity_check(goal: str, proposal: dict[str, Any]) -> dict[str, An
     try:
         with urlopen(request, timeout=15) as response:
             raw_response = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+    except (HTTPError, URLError, TimeoutError, IncompleteRead, RemoteDisconnected, json.JSONDecodeError) as exc:
         return {
             "decision": "MODIFY",
             "reason": f"RAG criteria found no explicit hazard, but the OpenAI safety sanity check could not complete: {type(exc).__name__}.",
@@ -527,6 +574,141 @@ def llm_safety_sanity_check(goal: str, proposal: dict[str, Any]) -> dict[str, An
     }
 
 
+def llm_modify_mitigation_check(
+    goal: str,
+    proposal: dict[str, Any],
+    modify_rule: CriteriaRule,
+) -> dict[str, Any]:
+    """Ask an LLM whether a RAG MODIFY requirement is already addressed."""
+    api_key, api_key_source = get_openai_api_key()
+    model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
+    controls_present = mitigation_controls_present(goal, proposal, modify_rule)
+
+    if not api_key:
+        return {
+            "decision": "MODIFY",
+            "reason": f"{modify_rule.reason} The LLM mitigation check is not configured.",
+            "requirements": [modify_rule.requirement],
+            "matchedCriteria": modify_rule.label,
+        }
+
+    prompt = {
+        "research_goal": goal,
+        "proposal": proposal,
+        "rag_modify_match": {
+            "label": modify_rule.label,
+            "reason": modify_rule.reason,
+            "required_action": modify_rule.requirement,
+        },
+        "local_mitigation_detector": {
+            "required_controls_appear_present": controls_present,
+            "instruction": "Use this as supporting evidence, but still reject if a hard unsafe condition is present.",
+        },
+        "review_task": (
+            "RAG found a MODIFY-level classroom safety concern. Determine whether the user's goal or the generated proposal "
+            "already includes the required action or equivalent controls. Approve only if the controls are clearly present. "
+            "For this demo, treat explicit commitments such as teacher supervision, small quantities, clear labels, cleanup, "
+            "safe handling, sealed containers, gloves, or allergy checks as sufficient when they match the RAG required action. "
+            "Do not require a detailed standard operating procedure. Keep MODIFY only if a required control category is missing "
+            "or vague. Reject only if the proposal contains a hard unsafe condition."
+        ),
+        "allowed_decisions": ["APPROVE", "MODIFY", "REJECT"],
+        "required_json_shape": {
+            "decision": "APPROVE | MODIFY | REJECT",
+            "reason": "one sentence",
+            "requirements": ["short required action"],
+        },
+    }
+
+    body = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a cautious classroom lab safety reviewer. "
+                    "Return only valid JSON. Do not add procedural detail for dangerous experiments."
+                ),
+            },
+            {
+                "role": "user",
+                "content": json.dumps(prompt),
+            },
+        ],
+        "temperature": 0,
+        "response_format": {"type": "json_object"},
+    }
+
+    request = Request(
+        OPENAI_API_URL,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=15) as response:
+            raw_response = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, IncompleteRead, RemoteDisconnected, json.JSONDecodeError) as exc:
+        return {
+            "decision": "MODIFY",
+            "reason": f"{modify_rule.reason} The LLM mitigation check could not complete: {type(exc).__name__}.",
+            "requirements": [modify_rule.requirement],
+            "matchedCriteria": modify_rule.label,
+        }
+
+    content = (
+        raw_response.get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "{}")
+    )
+
+    try:
+        llm_review = json.loads(content)
+    except json.JSONDecodeError:
+        return {
+            "decision": "MODIFY",
+            "reason": f"{modify_rule.reason} The LLM mitigation response was not valid JSON.",
+            "requirements": [modify_rule.requirement],
+            "matchedCriteria": modify_rule.label,
+        }
+
+    decision = str(llm_review.get("decision", "")).upper()
+    if decision not in {"APPROVE", "MODIFY", "REJECT"}:
+        decision = "MODIFY"
+
+    requirements = llm_review.get("requirements")
+    if not isinstance(requirements, list) or not requirements:
+        requirements = (
+            ["No further safety changes required."]
+            if decision == "APPROVE"
+            else [modify_rule.requirement]
+        )
+
+    if controls_present and decision != "REJECT":
+        return {
+            "decision": "APPROVE",
+            "reason": "The RAG-required safety controls are already included, and the LLM mitigation check did not identify a hard rejection.",
+            "requirements": ["Continue using the stated controls during the classroom activity."],
+            "matchedCriteria": f"{modify_rule.label} + LLM mitigation check",
+            "ragRequirement": modify_rule.requirement,
+            "llmReason": str(llm_review.get("reason") or ""),
+            "llmKeySource": api_key_source,
+        }
+
+    return {
+        "decision": decision,
+        "reason": str(llm_review.get("reason") or modify_rule.reason),
+        "requirements": [str(item) for item in requirements],
+        "matchedCriteria": f"{modify_rule.label} + LLM mitigation check",
+        "ragRequirement": modify_rule.requirement,
+        "llmKeySource": api_key_source,
+    }
+
+
 def openai_runtime_status() -> dict[str, Any]:
     """Return non-secret OpenAI runtime configuration status."""
     api_key, api_key_source = get_openai_api_key()
@@ -553,7 +735,8 @@ def openai_runtime_status() -> dict[str, Any]:
 # ============================================================
 # 1. The Safety Officer retrieves criteria from the local RAG file.
 # 2. Rejection rules outrank modification rules.
-# 3. If RAG finds no issue, an LLM performs a second-pass safety sanity check.
+# 3. MODIFY rules get an LLM mitigation check before remaining MODIFY.
+# 4. If RAG finds no issue, an LLM performs a second-pass safety sanity check.
 
 def safety_officer_agent(goal: str, proposal: dict[str, Any]) -> dict[str, Any]:
     """Review safety using RAG-backed criteria plus an LLM sanity check."""
@@ -568,12 +751,7 @@ def safety_officer_agent(goal: str, proposal: dict[str, Any]) -> dict[str, Any]:
 
     modify_rule = retrieve_criteria(goal, decision="MODIFY")
     if modify_rule:
-        return {
-            "decision": "MODIFY",
-            "reason": modify_rule.reason,
-            "requirements": [modify_rule.requirement],
-            "matchedCriteria": modify_rule.label,
-        }
+        return llm_modify_mitigation_check(goal, proposal, modify_rule)
 
     return llm_safety_sanity_check(goal, proposal)
 

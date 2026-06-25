@@ -16,6 +16,7 @@ REJECT | high heat | open flame|torch|combustion|burning|boiling oil|high heat|f
 REJECT | regulated or illegal activity | animal testing|human subject|medical treatment|drug|illegal | The proposal appears to involve regulated, illegal, or inappropriate activity for a classroom demo. | Replace with a non-human, non-animal, legal classroom model.
 
 MODIFY | minor classroom hazard | warm water|hot water|heat|temperature|yeast|baker'?s yeast|vinegar|baking soda|salt|sugar|caffeine|magnet|sharp|scissors | The proposal is mostly classroom-safe but includes a minor hazard, so it needs tighter controls. | Add teacher supervision, small quantities, cleanup, labeling, and handling procedures as appropriate.
+MODIFY | classroom water quality sample | water quality|tap water|distilled water|classroom water sample | The proposal compares water quality and should specify safe, teacher-approved water samples. | Use only teacher-approved, non-hazardous water samples, clear labels, small quantities, and cleanup procedures.
 MODIFY | outdoor or unknown sample | unknown water sample|outdoor sample|pond water|stream water|river water|lake water|soil sample | The proposal uses an outdoor or unknown sample that needs handling controls. | Use sealed containers, teacher handling, gloves if appropriate, and cleanup procedures.
 MODIFY | allergy or food handling | food handling|allergen|peanut|tree nut | The proposal may involve food handling or allergy considerations. | Avoid allergens, label materials clearly, and confirm classroom allergy policy.
 

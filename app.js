@@ -217,6 +217,16 @@ function controlsForReview(review) {
     );
   }
 
+  if (matched.includes("water quality")) {
+    controls.push(
+      "use only teacher-approved water samples",
+      "use non-hazardous classroom-safe water samples",
+      "use small quantities",
+      "clearly label all samples",
+      "include cleanup procedures"
+    );
+  }
+
   if (matched.includes("outdoor") || matched.includes("unknown sample")) {
     controls.push(
       "use sealed containers",

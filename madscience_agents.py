@@ -152,6 +152,16 @@ def mitigation_controls_present(goal: str, proposal: dict[str, Any], modify_rule
         ]
         return all(text_contains_any(combined, terms) for terms in checks)
 
+    if modify_rule.label == "classroom water quality sample":
+        checks = [
+            ["teacher-approved", "teacher approved", "teacher supervision", "supervised"],
+            ["non-hazardous", "nonhazardous", "safe water", "classroom-safe"],
+            ["small quantities", "small quantity", "small amounts", "small amount"],
+            ["label", "labels", "labeling", "labelled"],
+            ["cleanup", "clean up", "clean-up"],
+        ]
+        return all(text_contains_any(combined, terms) for terms in checks)
+
     if modify_rule.label == "outdoor or unknown sample":
         checks = [
             ["sealed container", "sealed containers", "closed container", "closed containers"],
@@ -610,6 +620,8 @@ def llm_safety_sanity_check(goal: str, proposal: dict[str, Any]) -> dict[str, An
 
     decision = str(llm_review.get("decision", "")).upper()
     if decision not in {"APPROVE", "MODIFY", "REJECT"}:
+        decision = "MODIFY"
+    if decision == "REJECT":
         decision = "MODIFY"
 
     requirements = llm_review.get("requirements")

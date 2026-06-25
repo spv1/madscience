@@ -263,6 +263,176 @@
         font-weight: 900;
       }
 
+      .linear-flow {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+        align-items: stretch;
+        margin-top: 8px;
+      }
+
+      .flow-step {
+        position: relative;
+        display: grid;
+        align-content: start;
+        gap: 8px;
+        min-height: 188px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        background: #fff;
+      }
+
+      .flow-step:not(:last-child)::after {
+        content: ">";
+        position: absolute;
+        top: 50%;
+        right: -13px;
+        z-index: 2;
+        display: grid;
+        place-items: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: var(--blue);
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 900;
+        transform: translateY(-50%);
+      }
+
+      .flow-number {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: #e8f1fb;
+        color: var(--blue);
+        font-weight: 950;
+      }
+
+      .flow-step:nth-child(3) .flow-number,
+      .flow-step:nth-child(4) .flow-number {
+        background: #e9f6f1;
+        color: var(--green);
+      }
+
+      .flow-step:nth-child(5) .flow-number,
+      .flow-step:nth-child(6) .flow-number {
+        background: #fff0d6;
+        color: var(--amber);
+      }
+
+      .flow-step h3 {
+        margin: 0;
+        font-size: clamp(0.88rem, 1.45vw, 1.05rem);
+        line-height: 1.1;
+        text-transform: uppercase;
+      }
+
+      .flow-step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: clamp(0.78rem, 1.2vw, 0.94rem);
+        line-height: 1.3;
+      }
+
+      .example-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 22px;
+      }
+
+      .example-item {
+        border-left: 4px solid var(--blue);
+        border-radius: 8px;
+        padding: 12px 14px;
+        background: #f8fafc;
+      }
+
+      .example-item:nth-child(2) {
+        border-left-color: var(--green);
+      }
+
+      .example-item:nth-child(3),
+      .example-item:nth-child(4) {
+        border-left-color: var(--amber);
+      }
+
+      .example-item strong,
+      .example-item span {
+        display: block;
+      }
+
+      .example-item strong {
+        margin-bottom: 4px;
+        font-size: 0.86rem;
+        text-transform: uppercase;
+      }
+
+      .example-item span {
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.25;
+      }
+
+      .inspired-table {
+        display: grid;
+        gap: 8px;
+      }
+
+      .inspired-slide .slide-inner {
+        padding-top: clamp(22px, 3.5vw, 38px);
+        padding-bottom: clamp(22px, 3.5vw, 38px);
+      }
+
+      .inspired-slide h2 {
+        margin-bottom: 12px;
+      }
+
+      .table-row {
+        display: grid;
+        grid-template-columns: 1fr 1.35fr 1.3fr;
+        gap: 12px;
+        align-items: stretch;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 12px;
+        background: #fff;
+      }
+
+      .table-row.header {
+        border-color: transparent;
+        background: var(--ink);
+        color: #fff;
+        font-weight: 900;
+      }
+
+      .table-row.header span {
+        color: #fff;
+      }
+
+      .table-row span {
+        color: var(--muted);
+        font-size: clamp(0.86rem, 1.4vw, 1.02rem);
+        line-height: 1.28;
+      }
+
+      .table-row strong {
+        display: block;
+        color: var(--ink);
+        font-size: clamp(0.92rem, 1.5vw, 1.08rem);
+      }
+
+      .source-note {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: clamp(0.9rem, 1.4vw, 1.05rem);
+        font-weight: 800;
+      }
+
       .iteration-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -402,12 +572,26 @@
         .workflow,
         .agent-map,
         .decision-row,
-        .iteration-grid {
+        .iteration-grid,
+        .linear-flow,
+        .example-strip,
+        .table-row {
           grid-template-columns: 1fr;
         }
 
         .agent-node {
           min-height: auto;
+        }
+
+        .flow-step {
+          min-height: auto;
+        }
+
+        .flow-step:not(:last-child)::after {
+          top: auto;
+          right: 50%;
+          bottom: -14px;
+          transform: translateX(50%) rotate(90deg);
         }
       }
     </style>
@@ -428,47 +612,100 @@
 
       <section class="slide" aria-label="Slide 2">
         <div class="slide-inner">
-          <h2>Design and Implementation Steps</h2>
-          <div class="workflow">
-            <div class="prompt-card">
-              <p><strong>Goal In</strong>Student enters a research goal, estimated cost, and budget limits.</p>
-              <p><strong>Guardrails First</strong>Invalid goals and unsafe topics are stopped before approval.</p>
-              <p><strong>Traceable Output</strong>Every agent decision is shown in the audit trail.</p>
+          <h2>Simple Agentic Flow</h2>
+          <div class="linear-flow" aria-label="MadScience linear orchestration flow">
+            <article class="flow-step">
+              <span class="flow-number">1</span>
+              <h3>Input Guardrail</h3>
+              <p>Checks that the goal is a classroom experiment and not just a broad topic.</p>
+            </article>
+            <article class="flow-step">
+              <span class="flow-number">2</span>
+              <h3>Scientist Agent</h3>
+              <p>Creates the objective, hypothesis, materials, method, learning outcomes, and cost.</p>
+            </article>
+            <article class="flow-step">
+              <span class="flow-number">3</span>
+              <h3>Safety Officer Agent</h3>
+              <p>Reviews hazards and can approve, request changes, reject, or escalate.</p>
+            </article>
+            <article class="flow-step">
+              <span class="flow-number">4</span>
+              <h3>Budget Analyst Agent</h3>
+              <p>Compares the cost with editable classroom budget limits.</p>
+            </article>
+            <article class="flow-step">
+              <span class="flow-number">5</span>
+              <h3>Orchestrator</h3>
+              <p>Combines reviews without overriding safety or budget decisions.</p>
+            </article>
+            <article class="flow-step">
+              <span class="flow-number">6</span>
+              <h3>Audit Trail</h3>
+              <p>Shows the proposal, reviews, final decision, and explanation.</p>
+            </article>
+          </div>
+          <div class="example-strip" aria-label="Classroom example outputs">
+            <div class="example-item">
+              <strong>Input</strong>
+              <span>Water quality and radish seed growth</span>
             </div>
-            <div>
-              <div class="agent-map" aria-label="Agent workflow diagram">
-                <article class="agent-node">
-                  <div class="agent-icon">S</div>
-                  <h3>Scientist Agent</h3>
-                  <p>Turns the goal into objective, hypothesis, materials, method, outcomes, and cost.</p>
-                </article>
-                <article class="agent-node">
-                  <div class="agent-icon">!</div>
-                  <h3>Safety Officer</h3>
-                  <p>Checks hazards, classroom fit, and whether modifications or rejection are required.</p>
-                </article>
-                <article class="agent-node">
-                  <div class="agent-icon">$</div>
-                  <h3>Budget Analyst</h3>
-                  <p>Compares the proposal cost with configurable classroom budget thresholds.</p>
-                </article>
-              </div>
-              <div class="decision-row" aria-label="Decision outcomes">
-                <span class="status-chip approve">APPROVED</span>
-                <span class="status-chip modify">MODIFY</span>
-                <span class="status-chip reject">REJECTED</span>
-                <span class="status-chip human">INVALID</span>
-              </div>
-              <a class="demo-link" href="https://madscience-cyan.vercel.app/" target="_blank" rel="noreferrer">
-                <strong>Live Vercel Demo</strong>
-                <span>madscience-cyan.vercel.app</span>
-              </a>
+            <div class="example-item">
+              <strong>Guardrail</strong>
+              <span>Valid classroom experiment</span>
+            </div>
+            <div class="example-item">
+              <strong>Review</strong>
+              <span>Household materials and cost within limit</span>
+            </div>
+            <div class="example-item">
+              <strong>Decision</strong>
+              <span>APPROVED with audit trail</span>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="slide" aria-label="Slide 3">
+      <section class="slide inspired-slide" aria-label="Slide 3">
+        <div class="slide-inner">
+          <h2>Inspired by Classroom Python Files</h2>
+          <div class="inspired-table" aria-label="Course file inspiration table">
+            <div class="table-row header">
+              <span>MadScience Component</span>
+              <span>Inspired By</span>
+              <span>What It Demonstrates</span>
+            </div>
+            <div class="table-row">
+              <strong>Input Validation</strong>
+              <span><code>03-01-a-input-guardrail-simple.py</code><br><code>03-01-b-input-guardrail-classifier.py</code></span>
+              <span>Checks whether the user goal is a valid classroom experiment.</span>
+            </div>
+            <div class="table-row">
+              <strong>Safety Rules</strong>
+              <span><code>04-01-tool-guardrail.py</code></span>
+              <span>Prevents unsafe experiment paths from being approved.</span>
+            </div>
+            <div class="table-row">
+              <strong>Human Review</strong>
+              <span><code>04-02-hitl-approval.py</code></span>
+              <span>Escalates ambiguous, outdoor, or student-data cases.</span>
+            </div>
+            <div class="table-row">
+              <strong>Agent Handoffs</strong>
+              <span><code>09-handoff-agents.py</code></span>
+              <span>Coordinates Scientist, Safety Officer, and Budget Analyst agents.</span>
+            </div>
+            <div class="table-row">
+              <strong>RAG Criteria</strong>
+              <span><code>12-rag-agent.py</code></span>
+              <span>Reads rejection and modification criteria from a small policy file.</span>
+            </div>
+          </div>
+          <p class="source-note">Live Vercel demo: <a href="https://madscience-cyan.vercel.app/" target="_blank" rel="noreferrer">madscience-cyan.vercel.app</a></p>
+        </div>
+      </section>
+
+      <section class="slide" aria-label="Slide 4">
         <div class="slide-inner">
           <h2>Iterative Changes</h2>
           <div class="iteration-grid">
@@ -515,6 +752,7 @@
     <footer class="progress">
       <div class="dots" aria-hidden="true">
         <span class="dot active"></span>
+        <span class="dot"></span>
         <span class="dot"></span>
         <span class="dot"></span>
       </div>

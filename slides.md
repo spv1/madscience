@@ -14,24 +14,36 @@ June 25, 2026
 
 ---
 
-# Design and Implementation Steps
+# Simple Agentic Flow
 
 ```mermaid
 flowchart LR
-  A["Research Goal + Cost"] --> B["Experiment Logic Check"]
-  B --> C["Scientist Proposal"]
-  C --> D["Safety Review"]
-  C --> E["Budget Review"]
-  D --> F["Final Decision"]
-  E --> F
+  A["Input Guardrail<br/>Checks this is a classroom experiment"] --> B["Scientist Agent<br/>Creates proposal and estimated cost"]
+  B --> C["Safety Officer Agent<br/>Reviews hazards and escalation needs"]
+  B --> D["Budget Analyst Agent<br/>Checks editable budget limits"]
+  C --> E["Orchestrator<br/>Combines reviews without overriding agents"]
+  D --> E
+  E --> F["Audit Trail<br/>Shows proposal, reviews, decision, explanation"]
 ```
 
-| Design Area | Classroom Demo Choice |
+| Example Field | Classroom Example |
 | --- | --- |
-| Guardrails | Invalid goals and dangerous experiments are stopped before approval |
-| Agents | Scientist proposes, Safety Officer reviews risk, Budget Analyst checks limits |
-| Traceability | Every decision is shown in the audit trail |
-| Publishing | GitHub repository `spv1/madscience` deployed on Vercel |
+| Input | Water quality and radish seed growth |
+| Guardrail | Valid classroom experiment |
+| Review | Household materials and cost within limit |
+| Final Decision | APPROVED with audit trail |
+
+---
+
+# Inspired by Classroom Python Files
+
+| MadScience Component | Inspired By | What It Demonstrates |
+| --- | --- | --- |
+| Input validation | `03-01-a-input-guardrail-simple.py` / `03-01-b-input-guardrail-classifier.py` | Checks whether the user goal is a valid classroom experiment |
+| Safety rules | `04-01-tool-guardrail.py` | Prevents unsafe experiment paths from being approved |
+| Human review | `04-02-hitl-approval.py` | Escalates ambiguous, outdoor, or student-data cases |
+| Agent handoffs | `09-handoff-agents.py` | Coordinates Scientist, Safety Officer, and Budget Analyst agents |
+| Rejection criteria lookup | `12-rag-agent.py` | Reads rejection and modification criteria from a small policy file |
 
 Live demo: [madscience-cyan.vercel.app](https://madscience-cyan.vercel.app/)
 

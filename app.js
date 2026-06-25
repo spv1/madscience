@@ -155,6 +155,9 @@ function renderDecision(result) {
   const budgetBasis = result.budgetReview
     ? `<div><dt>Budget basis</dt><dd>${escapeHtml(result.budgetReview.reason)}</dd></div>`
     : "";
+  const hitlBasis = result.humanApproval?.approvalRequired
+    ? `<div><dt>HITL approval</dt><dd>${escapeHtml(result.humanApproval.reason)} ${escapeHtml(result.humanApproval.requirements.join(" "))}</dd></div>`
+    : "";
 
   outputs.decision.innerHTML = `
     <dl class="detail-list">
@@ -162,6 +165,7 @@ function renderDecision(result) {
       <div><dt>Explanation</dt><dd>${escapeHtml(result.explanation)}</dd></div>
       ${safetyBasis}
       ${budgetBasis}
+      ${hitlBasis}
     </dl>
   `;
 }

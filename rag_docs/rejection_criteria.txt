@@ -1,0 +1,24 @@
+# MadScience rejection, modification, and HITL criteria.
+#
+# Format:
+# DECISION | label | regex pattern | reason shown in the UI | required action shown in the UI
+#
+# DECISION values:
+# REJECT = hard safety stop
+# MODIFY = safe enough to continue only after controls are added
+# HITL = not automatically rejected, but a teacher/admin must approve
+
+REJECT | high voltage | high[- ]?voltage|electrocution|mains electricity|tesla coil|visible arcs?|power supply | The proposal appears to involve high voltage. Classroom instructions are not allowed for that risk category. | Replace with a low-energy simulation, video analysis, or teacher-approved substitute.
+REJECT | explosives or energetic materials | explosive|explosion|detonation|gunpowder|firework|rocket fuel|propellant | The proposal appears to involve explosives or energetic materials. Classroom instructions are not allowed for that risk category. | Replace with a non-energetic model or teacher-approved demonstration.
+REJECT | hazardous materials or chemicals | hazardous (material|substance|chemical)|toxic material|toxic substance|strong acid|strong base|cyanide|mercury|chlorine gas|toxic gas|poison | The proposal appears to involve hazardous materials or chemicals. Classroom instructions are not allowed for that risk category. | Replace with a non-hazardous simulation, video analysis, or teacher-approved substitute.
+REJECT | biological agents | pathogen|virus|bacteria|mold|blood|bodily fluid|biological agent|culture unknown microbes | The proposal appears to involve biological agents or unknown microbial growth. Classroom instructions are not allowed for that risk category. | Use prepared safe media, public data, or a teacher-approved non-culture simulation.
+REJECT | high heat | open flame|torch|combustion|burning|boiling oil|high heat|furnace | The proposal appears to involve open flame or high heat. Classroom instructions are not allowed for that risk category. | Use low-temperature materials, simulations, or teacher demonstrations only.
+REJECT | regulated or illegal activity | animal testing|human subject|medical treatment|drug|illegal | The proposal appears to involve regulated, illegal, or inappropriate activity for a classroom demo. | Replace with a non-human, non-animal, legal classroom model.
+
+MODIFY | minor classroom hazard | warm water|hot water|heat|temperature|yeast|baker'?s yeast|vinegar|baking soda|salt|sugar|caffeine|magnet|sharp|scissors | The proposal is mostly classroom-safe but includes a minor hazard, so it needs tighter controls. | Add teacher supervision, small quantities, cleanup, labeling, and handling procedures as appropriate.
+MODIFY | outdoor or unknown sample | unknown water sample|outdoor sample|pond water|stream water|river water|lake water|soil sample | The proposal uses an outdoor or unknown sample that needs handling controls. | Use sealed containers, teacher handling, gloves if appropriate, and cleanup procedures.
+MODIFY | allergy or food handling | food handling|allergen|peanut|tree nut | The proposal may involve food handling or allergy considerations. | Avoid allergens, label materials clearly, and confirm classroom allergy policy.
+
+HITL | human measurements | heart rate|pulse|breathing rate|student data|survey|personal data | The proposal collects student or personal data and needs teacher approval before proceeding. | Confirm consent, privacy, and school policy before running the activity.
+HITL | field activity | field trip|outside classroom|off campus|parking lot|playground | The proposal moves outside the normal classroom setting and needs teacher or administrator approval. | Confirm supervision, location rules, and safety plan.
+HITL | unfamiliar material | new material|prototype material|vendor material | The proposal uses an unfamiliar material that should be checked by a human before approval. | Review the material identity and safety information before classroom use.

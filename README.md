@@ -27,6 +27,15 @@ The agent and orchestrator logic lives in:
 - `madscience_agents.py`: Scientist, Safety Officer, Budget Analyst, logic check, and final decision rules
 - `api/orchestrate.py`: Vercel Python API endpoint used by the browser app
 - `server.py`: local Python server for running the app and API together
+- `rag_docs/rejection_criteria.txt`: local RAG-style criteria file for rejections, modifications, and HITL review scenarios
+
+`madscience_agents.py` is organized in the same teaching style as the course examples:
+
+- input guardrails
+- RAG-backed rejection criteria
+- tool guardrail for the budget review tool
+- human-in-the-loop approval scenarios
+- handoff-style routing to specialist agents
 
 The presentation deck is available at:
 

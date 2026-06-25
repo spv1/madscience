@@ -1,11 +1,62 @@
+"""MadScience Experiments agentic demo.
+
+This file mirrors the beginner-friendly structure used in the course examples:
+
+1. Input guardrails block invalid classroom experiment requests.
+2. A local RAG file provides rejection, modification, and HITL criteria.
+3. Tool guardrails protect budget decisions before the budget tool runs.
+4. HITL approval scenarios escalate proposals that need a human reviewer.
+5. Handoff-style functions route work to the Scientist, Safety Officer, and Budget Analyst.
+
+Run locally through the browser app:
+    python3 server.py
+
+Try:
+    "Design a safe classroom experiment that shows how water quality affects radish seed growth."
+    "study the trajectory of planets"
+    "Explore whether a new hazardous material keeps a battery running much longer"
+    "Compare how student heart rates change after exercise."
+"""
+
+from __future__ import annotations
+
 import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 
-def normalize_goal(goal):
+RAG_FOLDER = Path(__file__).parent / "rag_docs"
+REJECTION_CRITERIA_FILE = RAG_FOLDER / "rejection_criteria.txt"
+
+
+# ============================================================
+# Shared data structures
+# ============================================================
+# These classes keep the orchestration output consistent for the browser UI.
+
+@dataclass
+class CriteriaRule:
+    decision: str
+    label: str
+    pattern: str
+    reason: str
+    requirement: str
+
+
+# ============================================================
+# Basic normalization helpers
+# ============================================================
+# These helpers replace the small bits of cleanup that would normally happen
+# before an agent run starts.
+
+def normalize_goal(goal: Any) -> str:
+    """Clean up user-entered research goals."""
     return re.sub(r"\s+", " ", str(goal or "").strip())
 
 
-def normalize_cost(cost):
+def normalize_cost(cost: Any) -> int | None:
+    """Convert user-entered costs and thresholds into whole-dollar values."""
     try:
         value = float(cost)
     except (TypeError, ValueError):
@@ -13,7 +64,8 @@ def normalize_cost(cost):
     return round(value) if value >= 0 else None
 
 
-def normalize_budget_policy(policy):
+def normalize_budget_policy(policy: dict[str, Any] | None) -> dict[str, int] | None:
+    """Validate the presenter's budget thresholds."""
     policy = policy or {}
     approve_max = normalize_cost(policy.get("approveMax"))
     reject_at = normalize_cost(policy.get("rejectAt"))
@@ -24,12 +76,47 @@ def normalize_budget_policy(policy):
     return {"approveMax": approve_max, "rejectAt": reject_at}
 
 
-def sentence_case(value):
+def sentence_case(value: Any) -> str:
+    """Capitalize the first character without changing the rest of the text."""
     clean = str(value or "").strip()
     return clean[:1].upper() + clean[1:]
 
 
-def check_experiment_logic(goal):
+# ============================================================
+# Input guardrails
+# ============================================================
+# 1. Input guardrails run before any specialist agent is called.
+# 2. They block missing, malformed, or non-experiment requests.
+# 3. A blocked input never reaches Scientist, Safety, or Budget review.
+
+def required_fields_guardrail(goal: str, cost: int | None, policy: dict[str, int] | None) -> dict[str, Any]:
+    """Block runs that do not have the minimum fields needed for review."""
+    if not goal:
+        return {
+            "valid": False,
+            "reason": "A research goal is required.",
+            "suggestion": "Enter a testable classroom experiment goal.",
+        }
+
+    if cost is None:
+        return {
+            "valid": False,
+            "reason": "A valid estimated cost is required.",
+            "suggestion": "Enter a whole-dollar estimated cost.",
+        }
+
+    if policy is None:
+        return {
+            "valid": False,
+            "reason": "Budget thresholds are invalid. Reject-from must be greater than approve-up-to.",
+            "suggestion": "Set the reject threshold higher than the approve threshold.",
+        }
+
+    return {"valid": True, "reason": "Required fields are present."}
+
+
+def experiment_logic_guardrail(goal: str) -> dict[str, Any]:
+    """Block requests that are not actionable classroom experiments."""
     lower = goal.lower()
     impossible_scale = re.search(
         r"planet|orbit|solar system|galaxy|star|black hole|comet|asteroid",
@@ -64,57 +151,149 @@ def check_experiment_logic(goal):
     }
 
 
-def identify_safety_profile(goal):
+# ============================================================
+# RAG criteria loader
+# ============================================================
+# 1. The safety and HITL criteria live in rag_docs/rejection_criteria.txt.
+# 2. Each rule is pipe-delimited so teachers can edit it without touching code.
+# 3. The Safety Officer retrieves the first matching rule for the goal.
+
+def load_rejection_criteria(path: Path = REJECTION_CRITERIA_FILE) -> list[CriteriaRule]:
+    """Load reject, modify, and HITL rules from a local RAG-style text file."""
+    rules: list[CriteriaRule] = []
+    text = path.read_text(encoding="utf-8")
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        parts = [part.strip() for part in line.split(" | ")]
+        if len(parts) != 5:
+            continue
+
+        decision, label, pattern, reason, requirement = parts
+        rules.append(
+            CriteriaRule(
+                decision=decision.upper(),
+                label=label,
+                pattern=pattern,
+                reason=reason,
+                requirement=requirement,
+            )
+        )
+
+    if not rules:
+        raise RuntimeError(f"Add at least one criteria rule to {path}.")
+
+    return rules
+
+
+def retrieve_criteria(goal: str, decision: str | None = None) -> CriteriaRule | None:
+    """Retrieve the first local criteria rule that matches the research goal."""
     lower = goal.lower()
-    reject_rules = [
-        (
-            r"high[- ]?voltage|electrocution|mains electricity|tesla coil|visible arcs?|power supply",
-            "high voltage",
-        ),
-        (
-            r"explosive|explosion|detonation|gunpowder|firework|rocket fuel|propellant",
-            "explosives or energetic materials",
-        ),
-        (
-            r"hazardous (material|substance|chemical)|toxic material|toxic substance|strong acid|strong base|cyanide|mercury|chlorine gas|toxic gas|poison",
-            "hazardous materials or chemicals",
-        ),
-        (
-            r"pathogen|virus|bacteria|mold|blood|bodily fluid|biological agent|culture unknown microbes",
-            "biological agents",
-        ),
-        (
-            r"open flame|torch|combustion|burning|boiling oil|high heat|furnace",
-            "high heat",
-        ),
-        (
-            r"animal testing|human subject|medical treatment|drug|illegal",
-            "regulated or illegal activity",
-        ),
-    ]
-    modify_rules = [
-        (
-            r"warm water|hot water|heat|temperature|yeast|baker'?s yeast|vinegar|baking soda|salt|sugar|caffeine|magnet|sharp|scissors",
-            "minor classroom hazard",
-        ),
-        (
-            r"unknown water sample|outdoor sample|pond water|stream water|river water|lake water|soil sample|food handling|allergen|peanut|tree nut",
-            "materials that need handling controls",
-        ),
-    ]
 
-    for pattern, label in reject_rules:
-        if re.search(pattern, lower):
-            return {"risk": "hazardous", "trigger": label}
+    for rule in load_rejection_criteria():
+        if decision and rule.decision != decision.upper():
+            continue
+        if re.search(rule.pattern, lower):
+            return rule
 
-    for pattern, label in modify_rules:
-        if re.search(pattern, lower):
-            return {"risk": "minor", "trigger": label}
-
-    return {"risk": "household", "trigger": "household materials only"}
+    return None
 
 
-def infer_study_type(goal):
+# ============================================================
+# Tool guardrail
+# ============================================================
+# 1. The Budget Analyst uses a budget review "tool."
+# 2. The guardrail checks threshold validity before the tool runs.
+# 3. Bad threshold settings are blocked before a decision is fabricated.
+
+def budget_tool_guardrail(cost: int, policy: dict[str, int]) -> dict[str, Any]:
+    """Protect the budget review tool from invalid inputs."""
+    if cost < 0:
+        return {
+            "allowed": False,
+            "reason": "Estimated cost cannot be negative.",
+        }
+
+    if policy["rejectAt"] <= policy["approveMax"]:
+        return {
+            "allowed": False,
+            "reason": "Reject-from must be greater than approve-up-to.",
+        }
+
+    return {"allowed": True, "reason": "Budget tool input is valid."}
+
+
+def budget_review_tool(cost: int, policy: dict[str, int]) -> dict[str, Any]:
+    """Review proposal cost using presenter-configurable thresholds."""
+    guardrail = budget_tool_guardrail(cost, policy)
+    if not guardrail["allowed"]:
+        return {
+            "decision": "REJECT",
+            "reason": guardrail["reason"],
+            "requirements": ["Fix the budget settings before running the review."],
+        }
+
+    if cost >= policy["rejectAt"]:
+        return {
+            "decision": "REJECT",
+            "reason": f"Estimated cost is ${cost:,}, which meets or exceeds the ${policy['rejectAt']:,} rejection threshold.",
+            "requirements": ["Choose a lower-cost research design."],
+        }
+
+    if cost > policy["approveMax"]:
+        return {
+            "decision": "MODIFY",
+            "reason": f"Estimated cost is ${cost:,}, above the ${policy['approveMax']:,} approval limit and below the ${policy['rejectAt']:,} rejection threshold.",
+            "requirements": [
+                "Reduce equipment, reuse existing materials, or narrow the scope."
+            ],
+        }
+
+    return {
+        "decision": "APPROVE",
+        "reason": f"Estimated cost is ${cost:,}, within the ${policy['approveMax']:,} approval threshold.",
+        "requirements": ["Track actual expenses against the estimate."],
+    }
+
+
+# ============================================================
+# HITL approval
+# ============================================================
+# 1. HITL approval is used when the demo should not auto-approve.
+# 2. These scenarios are not always rejected; they need human judgment.
+# 3. The UI marks them HUMAN REVIEW so a teacher or administrator can decide.
+
+def human_approval_check(goal: str, proposal: dict[str, Any]) -> dict[str, Any]:
+    """Return a pending approval if the proposal needs human review."""
+    hitl_rule = retrieve_criteria(goal, decision="HITL")
+    if not hitl_rule:
+        return {
+            "approvalRequired": False,
+            "reason": "No human approval scenario matched.",
+            "requirements": [],
+        }
+
+    return {
+        "approvalRequired": True,
+        "reviewer": "Teacher or administrator",
+        "reason": hitl_rule.reason,
+        "requirements": [hitl_rule.requirement],
+        "proposalObjective": proposal["objective"],
+    }
+
+
+# ============================================================
+# Scientist Agent
+# ============================================================
+# 1. The Scientist Agent creates the proposal.
+# 2. It does not approve experiments.
+# 3. It withholds procedural detail when the safety profile is hazardous.
+
+def infer_study_type(goal: str) -> dict[str, Any]:
+    """Infer a classroom-scale study shape from the entered goal."""
     lower = goal.lower()
 
     if re.search(r"plant|seed|soil|water quality|germination|growth", lower):
@@ -167,11 +346,12 @@ def infer_study_type(goal):
     }
 
 
-def infer_proposal(goal, cost):
-    safety_profile = identify_safety_profile(goal)
+def scientist_agent(goal: str, cost: int) -> dict[str, Any]:
+    """Create an experiment proposal from the research goal."""
+    reject_rule = retrieve_criteria(goal, decision="REJECT")
     study_type = infer_study_type(goal)
     objective_goal = sentence_case(re.sub(r"[.?!]+$", "", goal))
-    hazardous = safety_profile["risk"] == "hazardous"
+    hazardous = reject_rule is not None
 
     return {
         "objective": objective_goal,
@@ -192,70 +372,103 @@ def infer_proposal(goal, cost):
         ),
         "outcomes": "Students practice hypothesis formation, controls, measurement, evidence-based explanation, and responsible review of safety and resource constraints.",
         "cost": cost,
-        "risk": safety_profile["risk"],
-        "safetyTrigger": safety_profile["trigger"],
     }
 
 
-def review_safety(proposal):
-    if proposal["risk"] == "hazardous":
+# ============================================================
+# Safety Officer Agent
+# ============================================================
+# 1. The Safety Officer retrieves criteria from the local RAG file.
+# 2. Rejection rules outrank modification rules.
+# 3. HITL rules are reported separately from safety approval.
+
+def safety_officer_agent(goal: str, _proposal: dict[str, Any]) -> dict[str, Any]:
+    """Review safety using RAG-backed criteria."""
+    reject_rule = retrieve_criteria(goal, decision="REJECT")
+    if reject_rule:
         return {
             "decision": "REJECT",
-            "reason": f"The proposal appears to involve {proposal['safetyTrigger']}. Classroom instructions are not allowed for that risk category.",
-            "requirements": [
-                "Replace with a non-hazardous simulation, video analysis, or teacher-approved substitute."
-            ],
+            "reason": reject_rule.reason,
+            "requirements": [reject_rule.requirement],
+            "matchedCriteria": reject_rule.label,
         }
 
-    if proposal["risk"] == "minor":
+    modify_rule = retrieve_criteria(goal, decision="MODIFY")
+    if modify_rule:
         return {
             "decision": "MODIFY",
-            "reason": f"The proposal is mostly classroom-safe but includes {proposal['safetyTrigger']}, so it needs tighter controls.",
-            "requirements": [
-                "Add teacher supervision, small quantities, cleanup, labeling, and handwashing or handling procedures as appropriate."
-            ],
+            "reason": modify_rule.reason,
+            "requirements": [modify_rule.requirement],
+            "matchedCriteria": modify_rule.label,
         }
 
     return {
         "decision": "APPROVE",
         "reason": "Materials are household-level and the procedure avoids dangerous heat, voltage, chemicals, and biological agents.",
         "requirements": ["Keep quantities small and supervise measurements."],
+        "matchedCriteria": "household materials only",
     }
 
 
-def review_budget(proposal, policy):
-    cost = proposal["cost"]
+# ============================================================
+# Budget Analyst Agent
+# ============================================================
+# 1. The Budget Analyst uses the guarded budget review tool.
+# 2. The agent returns approve, modify, or reject.
+# 3. It cannot override the Safety Officer.
 
-    if cost >= policy["rejectAt"]:
-        return {
-            "decision": "REJECT",
-            "reason": f"Estimated cost is ${cost:,}, which meets or exceeds the ${policy['rejectAt']:,} rejection threshold.",
-            "requirements": ["Choose a lower-cost research design."],
-        }
-
-    if cost > policy["approveMax"]:
-        return {
-            "decision": "MODIFY",
-            "reason": f"Estimated cost is ${cost:,}, above the ${policy['approveMax']:,} approval limit and below the ${policy['rejectAt']:,} rejection threshold.",
-            "requirements": [
-                "Reduce equipment, reuse existing materials, or narrow the scope."
-            ],
-        }
-
-    return {
-        "decision": "APPROVE",
-        "reason": f"Estimated cost is ${cost:,}, within the ${policy['approveMax']:,} approval threshold.",
-        "requirements": ["Track actual expenses against the estimate."],
-    }
+def budget_analyst_agent(proposal: dict[str, Any], policy: dict[str, int]) -> dict[str, Any]:
+    """Review cost and resource requirements."""
+    return budget_review_tool(proposal["cost"], policy)
 
 
-def evaluate_reviews(safety, budget):
+# ============================================================
+# Handoff triage agent
+# ============================================================
+# 1. The orchestrator hands work to each specialist in sequence.
+# 2. This mirrors the handoff example without requiring a network model call.
+# 3. Each specialist owns one decision surface.
+
+def handoff_to_scientist(goal: str, cost: int) -> dict[str, Any]:
+    """Handoff to the Scientist Agent."""
+    return scientist_agent(goal, cost)
+
+
+def handoff_to_safety(goal: str, proposal: dict[str, Any]) -> dict[str, Any]:
+    """Handoff to the Lab Safety Officer Agent."""
+    return safety_officer_agent(goal, proposal)
+
+
+def handoff_to_budget(proposal: dict[str, Any], policy: dict[str, int]) -> dict[str, Any]:
+    """Handoff to the Budget Analyst Agent."""
+    return budget_analyst_agent(proposal, policy)
+
+
+# ============================================================
+# Final decision logic
+# ============================================================
+# 1. Safety and budget rejection blocks approval.
+# 2. HITL approval escalates when no hard rejection happened.
+# 3. Modification requests require proposal changes before approval.
+
+def evaluate_reviews(
+    safety: dict[str, Any],
+    budget: dict[str, Any],
+    hitl: dict[str, Any],
+) -> dict[str, str]:
+    """Combine reviewer decisions into one final orchestrator decision."""
     decisions = [safety["decision"], budget["decision"]]
 
     if "REJECT" in decisions:
         return {
             "decision": "REJECTED",
             "explanation": "At least one required reviewer rejected the proposal, so the orchestrator cannot approve or modify it.",
+        }
+
+    if hitl["approvalRequired"]:
+        return {
+            "decision": "HUMAN REVIEW",
+            "explanation": f"Human approval is required. {hitl['reason']}",
         }
 
     if "MODIFY" in decisions:
@@ -276,23 +489,28 @@ def evaluate_reviews(safety, budget):
     }
 
 
-def orchestrate(payload):
+# ============================================================
+# Run the orchestrator
+# ============================================================
+# 1. The browser sends JSON to api/orchestrate.py.
+# 2. The API calls orchestrate().
+# 3. The returned JSON drives the UI and audit trail.
+
+def orchestrate(payload: dict[str, Any]) -> dict[str, Any]:
+    """Coordinate input guardrails, handoffs, tool guardrails, HITL, and final decision."""
     goal = normalize_goal(payload.get("goal"))
     cost = normalize_cost(payload.get("cost"))
     policy = normalize_budget_policy(payload.get("budgetPolicy"))
+    required_fields = required_fields_guardrail(goal, cost, policy)
 
-    if not goal:
-        raise ValueError("A research goal is required.")
-    if cost is None:
-        raise ValueError("A valid estimated cost is required.")
-    if policy is None:
-        raise ValueError("Budget thresholds are invalid. Reject-from must be greater than approve-up-to.")
+    if not required_fields["valid"]:
+        raise ValueError(required_fields["reason"])
 
     audit = [f"Research goal received: {goal}"]
-    logic_check = check_experiment_logic(goal)
+    logic_check = experiment_logic_guardrail(goal)
 
     if not logic_check["valid"]:
-        audit.append(f"Experiment logic check failed. {logic_check['reason']}")
+        audit.append(f"Input guardrail blocked the request. {logic_check['reason']}")
         return {
             "status": "invalid",
             "goal": goal,
@@ -302,19 +520,29 @@ def orchestrate(payload):
             "audit": audit,
         }
 
-    audit.append("Experiment logic check passed. The goal is valid for this classroom workflow.")
-    proposal = infer_proposal(goal, cost)
+    audit.append("Input guardrail passed. The goal is valid for this classroom workflow.")
+    proposal = handoff_to_scientist(goal, cost)
     audit.append(
-        f"Scientist Agent produced proposal with estimated cost ${proposal['cost']:,} and risk category {proposal['risk']}."
+        f"Handoff to Scientist Agent complete. Proposal cost: ${proposal['cost']:,}."
     )
 
-    safety = review_safety(proposal)
-    audit.append(f"Lab Safety Officer decision: {safety['decision']}. {safety['reason']}")
+    safety = handoff_to_safety(goal, proposal)
+    audit.append(
+        f"Handoff to Lab Safety Officer complete. Decision: {safety['decision']}. {safety['reason']}"
+    )
 
-    budget = review_budget(proposal, policy)
-    audit.append(f"Budget Analyst decision: {budget['decision']}. {budget['reason']}")
+    budget = handoff_to_budget(proposal, policy)
+    audit.append(
+        f"Handoff to Budget Analyst complete. Decision: {budget['decision']}. {budget['reason']}"
+    )
 
-    final = evaluate_reviews(safety, budget)
+    hitl = human_approval_check(goal, proposal)
+    if hitl["approvalRequired"]:
+        audit.append(
+            f"HITL approval required from {hitl['reviewer']}. {hitl['reason']}"
+        )
+
+    final = evaluate_reviews(safety, budget, hitl)
     audit.append(f"Orchestrator final decision: {final['decision']}. {final['explanation']}")
 
     return {
@@ -324,6 +552,7 @@ def orchestrate(payload):
         "proposal": proposal,
         "safetyReview": safety,
         "budgetReview": budget,
+        "humanApproval": hitl,
         "finalDecision": final["decision"],
         "explanation": final["explanation"],
         "audit": audit,

@@ -35,6 +35,11 @@ RAG_FOLDER = Path(__file__).parent / "rag_docs"
 REJECTION_CRITERIA_FILE = RAG_FOLDER / "rejection_criteria.txt"
 ENV_FILE = Path(__file__).parent / ".env"
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+OPENAI_API_KEY_ENV_NAMES = (
+    "OPENAI_API_KEY",
+    "OPENAI_KEY",
+    "OPEN_AI_API_KEY",
+)
 
 
 # ============================================================
@@ -108,6 +113,16 @@ def load_local_env(path: Path = ENV_FILE) -> None:
 
 
 load_local_env()
+
+
+def get_openai_api_key() -> tuple[str, str | None]:
+    """Return the first configured OpenAI key and the env var name that supplied it."""
+    for name in OPENAI_API_KEY_ENV_NAMES:
+        value = os.environ.get(name, "").strip()
+        if value and not value.startswith("replace-with"):
+            return value, name
+
+    return "", None
 
 
 # ============================================================
@@ -412,14 +427,14 @@ def scientist_agent(goal: str, cost: int) -> dict[str, Any]:
 
 def llm_safety_sanity_check(goal: str, proposal: dict[str, Any]) -> dict[str, Any]:
     """Ask an LLM whether a RAG-cleared proposal is reasonably classroom-safe."""
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    api_key, api_key_source = get_openai_api_key()
     model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
 
     if not api_key or api_key.startswith("replace-with"):
         return {
             "decision": "MODIFY",
             "reason": "RAG criteria found no explicit hazard, but the OpenAI safety sanity check is not configured.",
-            "requirements": ["Add OPENAI_API_KEY to .env locally or to Vercel environment variables before allowing automatic safety approval."],
+            "requirements": ["Add OPENAI_API_KEY to .env locally or to Vercel Production environment variables before allowing automatic safety approval."],
             "matchedCriteria": "llm safety check unavailable",
         }
 
@@ -508,19 +523,26 @@ def llm_safety_sanity_check(goal: str, proposal: dict[str, Any]) -> dict[str, An
         "reason": str(llm_review.get("reason") or "LLM safety sanity check completed."),
         "requirements": [str(item) for item in requirements],
         "matchedCriteria": "RAG clear + LLM safety sanity check",
+        "llmKeySource": api_key_source,
     }
 
 
 def openai_runtime_status() -> dict[str, Any]:
     """Return non-secret OpenAI runtime configuration status."""
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    api_key, api_key_source = get_openai_api_key()
     model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
-    configured = bool(api_key) and not api_key.startswith("replace-with")
+    configured = bool(api_key)
     fingerprint = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:8] if configured else None
+    checked_names = {
+        name: bool(os.environ.get(name, "").strip())
+        for name in OPENAI_API_KEY_ENV_NAMES
+    }
 
     return {
         "openaiConfigured": configured,
         "model": model,
+        "keySource": api_key_source,
+        "checkedKeyNames": checked_names,
         "keyFingerprint": fingerprint,
         "keyLength": len(api_key) if configured else 0,
     }

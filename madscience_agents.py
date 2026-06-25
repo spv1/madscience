@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -507,6 +508,21 @@ def llm_safety_sanity_check(goal: str, proposal: dict[str, Any]) -> dict[str, An
         "reason": str(llm_review.get("reason") or "LLM safety sanity check completed."),
         "requirements": [str(item) for item in requirements],
         "matchedCriteria": "RAG clear + LLM safety sanity check",
+    }
+
+
+def openai_runtime_status() -> dict[str, Any]:
+    """Return non-secret OpenAI runtime configuration status."""
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
+    configured = bool(api_key) and not api_key.startswith("replace-with")
+    fingerprint = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:8] if configured else None
+
+    return {
+        "openaiConfigured": configured,
+        "model": model,
+        "keyFingerprint": fingerprint,
+        "keyLength": len(api_key) if configured else 0,
     }
 
 

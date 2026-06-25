@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from madscience_agents import orchestrate
+from madscience_agents import openai_runtime_status, orchestrate
 
 
 class handler(BaseHTTPRequestHandler):
@@ -31,4 +31,11 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(500, {"error": "The orchestrator could not process this request."})
 
     def do_GET(self):
-        self._send_json(200, {"ok": True, "service": "MadScience Experiments Orchestrator"})
+        self._send_json(
+            200,
+            {
+                "ok": True,
+                "service": "MadScience Experiments Orchestrator",
+                "runtime": openai_runtime_status(),
+            },
+        )

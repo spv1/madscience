@@ -1,10 +1,24 @@
 import json
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-from madscience_agents import orchestrate
+from madscience_agents import openai_runtime_status, orchestrate
 
 
 class MadScienceHandler(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/api/orchestrate":
+            self._send_json(
+                200,
+                {
+                    "ok": True,
+                    "service": "MadScience Experiments Orchestrator",
+                    "runtime": openai_runtime_status(),
+                },
+            )
+            return
+
+        super().do_GET()
+
     def do_POST(self):
         if self.path != "/api/orchestrate":
             self.send_error(404, "Not found")

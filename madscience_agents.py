@@ -20,14 +20,20 @@ Try:
 
 from __future__ import annotations
 
+import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 
 RAG_FOLDER = Path(__file__).parent / "rag_docs"
 REJECTION_CRITERIA_FILE = RAG_FOLDER / "rejection_criteria.txt"
+ENV_FILE = Path(__file__).parent / ".env"
+OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 
 # ============================================================
@@ -80,6 +86,27 @@ def sentence_case(value: Any) -> str:
     """Capitalize the first character without changing the rest of the text."""
     clean = str(value or "").strip()
     return clean[:1].upper() + clean[1:]
+
+
+def load_local_env(path: Path = ENV_FILE) -> None:
+    """Load simple KEY=value pairs from .env for local classroom runs."""
+    if not path.exists():
+        return
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+load_local_env()
 
 
 # ============================================================
@@ -376,14 +403,122 @@ def scientist_agent(goal: str, cost: int) -> dict[str, Any]:
 
 
 # ============================================================
+# LLM safety sanity check
+# ============================================================
+# 1. RAG criteria still handles explicit reject, modify, and HITL cases first.
+# 2. When RAG finds no problem, the LLM does a second-pass reasonableness check.
+# 3. Missing or failed LLM review cannot be treated as approval.
+
+def llm_safety_sanity_check(goal: str, proposal: dict[str, Any]) -> dict[str, Any]:
+    """Ask an LLM whether a RAG-cleared proposal is reasonably classroom-safe."""
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
+
+    if not api_key or api_key.startswith("replace-with"):
+        return {
+            "decision": "MODIFY",
+            "reason": "RAG criteria found no explicit hazard, but the OpenAI safety sanity check is not configured.",
+            "requirements": ["Add OPENAI_API_KEY to .env locally or to Vercel environment variables before allowing automatic safety approval."],
+            "matchedCriteria": "llm safety check unavailable",
+        }
+
+    prompt = {
+        "research_goal": goal,
+        "proposal": proposal,
+        "review_task": (
+            "Decide whether this is a reasonable supervised classroom experiment for K-12 or introductory students. "
+            "Do not provide dangerous procedural instructions. Prefer MODIFY when controls are needed. "
+            "Reject if it involves hazardous chemicals, unknown hazardous materials, biological agents, explosives, high voltage, high heat, illegal activity, or unsafe human-subject activity."
+        ),
+        "allowed_decisions": ["APPROVE", "MODIFY", "REJECT"],
+        "required_json_shape": {
+            "decision": "APPROVE | MODIFY | REJECT",
+            "reason": "one sentence",
+            "requirements": ["short required action"],
+        },
+    }
+
+    body = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a cautious classroom lab safety reviewer. "
+                    "Return only valid JSON. Never approve if safety is ambiguous."
+                ),
+            },
+            {
+                "role": "user",
+                "content": json.dumps(prompt),
+            },
+        ],
+        "temperature": 0,
+        "response_format": {"type": "json_object"},
+    }
+
+    request = Request(
+        OPENAI_API_URL,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=15) as response:
+            raw_response = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return {
+            "decision": "MODIFY",
+            "reason": f"RAG criteria found no explicit hazard, but the OpenAI safety sanity check could not complete: {type(exc).__name__}.",
+            "requirements": ["Have the teacher review the activity or retry after the LLM safety check is available."],
+            "matchedCriteria": "llm safety check failed",
+        }
+
+    content = (
+        raw_response.get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "{}")
+    )
+
+    try:
+        llm_review = json.loads(content)
+    except json.JSONDecodeError:
+        return {
+            "decision": "MODIFY",
+            "reason": "RAG criteria found no explicit hazard, but the LLM safety response was not valid JSON.",
+            "requirements": ["Have the teacher review the activity before classroom use."],
+            "matchedCriteria": "llm safety check invalid response",
+        }
+
+    decision = str(llm_review.get("decision", "")).upper()
+    if decision not in {"APPROVE", "MODIFY", "REJECT"}:
+        decision = "MODIFY"
+
+    requirements = llm_review.get("requirements")
+    if not isinstance(requirements, list) or not requirements:
+        requirements = ["Keep quantities small, use teacher-approved materials, and supervise measurements."]
+
+    return {
+        "decision": decision,
+        "reason": str(llm_review.get("reason") or "LLM safety sanity check completed."),
+        "requirements": [str(item) for item in requirements],
+        "matchedCriteria": "RAG clear + LLM safety sanity check",
+    }
+
+
+# ============================================================
 # Safety Officer Agent
 # ============================================================
 # 1. The Safety Officer retrieves criteria from the local RAG file.
 # 2. Rejection rules outrank modification rules.
-# 3. HITL rules are reported separately from safety approval.
+# 3. If RAG finds no issue, an LLM performs a second-pass safety sanity check.
 
-def safety_officer_agent(goal: str, _proposal: dict[str, Any]) -> dict[str, Any]:
-    """Review safety using RAG-backed criteria."""
+def safety_officer_agent(goal: str, proposal: dict[str, Any]) -> dict[str, Any]:
+    """Review safety using RAG-backed criteria plus an LLM sanity check."""
     reject_rule = retrieve_criteria(goal, decision="REJECT")
     if reject_rule:
         return {
@@ -402,12 +537,7 @@ def safety_officer_agent(goal: str, _proposal: dict[str, Any]) -> dict[str, Any]
             "matchedCriteria": modify_rule.label,
         }
 
-    return {
-        "decision": "APPROVE",
-        "reason": "Materials are household-level and the procedure avoids dangerous heat, voltage, chemicals, and biological agents.",
-        "requirements": ["Keep quantities small and supervise measurements."],
-        "matchedCriteria": "household materials only",
-    }
+    return llm_safety_sanity_check(goal, proposal)
 
 
 # ============================================================

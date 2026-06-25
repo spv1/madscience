@@ -6,9 +6,18 @@ A classroom-friendly agentic demo that coordinates three specialized agents:
 - Lab Safety Officer Agent: reviews hazards and can approve, modify, or reject.
 - Budget Analyst Agent: reviews entered cost against budget policy.
 
-The demo is intentionally client-side and dependency-free so it can run locally, on GitHub Pages, or as a static Vercel deployment.
+The demo uses a small Python API so the browser can call the agent orchestrator without exposing server-side logic.
 
 ## Local Run
+
+Create a local `.env` file with your OpenAI key before expecting automatic safety approval:
+
+```text
+OPENAI_API_KEY=replace-with-your-openai-api-key
+OPENAI_MODEL=gpt-4o-mini
+```
+
+The `.env` file is ignored by git. For Vercel, add the same variables in the project environment settings.
 
 ```bash
 python3 server.py
@@ -33,6 +42,7 @@ The agent and orchestrator logic lives in:
 
 - input guardrails
 - RAG-backed rejection criteria
+- LLM safety sanity check after RAG criteria are cleared
 - tool guardrail for the budget review tool
 - human-in-the-loop approval scenarios
 - handoff-style routing to specialist agents
@@ -55,6 +65,7 @@ Presenters can change the budget thresholds in the UI before running the agents.
 
 Safety:
 
-- Household materials only: approve
+- RAG criteria clear + LLM safety sanity check approves: approve
 - Minor classroom hazards: modify
 - Hazardous materials, hazardous chemicals, biological agents, explosives, high voltage, high heat, illegal, or regulated activity: reject
+- If the OpenAI key is missing or the LLM check fails: modify and require teacher review before classroom use

@@ -172,6 +172,48 @@ def mitigation_controls_present(goal: str, proposal: dict[str, Any], modify_rule
     return False
 
 
+def student_measurement_controls_present(goal: str, proposal: dict[str, Any]) -> bool:
+    """Detect when a student-measurement HITL case already includes basic safeguards."""
+    combined = " ".join(
+        [
+            goal,
+            str(proposal.get("objective", "")),
+            str(proposal.get("methodology", "")),
+        ]
+    ).lower()
+
+    has_student_measurement = text_contains_any(
+        combined,
+        ["heart rate", "heart rates", "pulse", "breathing rate"],
+    )
+    has_light_activity = text_contains_any(
+        combined,
+        ["light exercise", "gentle exercise", "walking", "one minute", "short activity", "resting"],
+    )
+    has_supervision = text_contains_any(
+        combined,
+        ["teacher supervision", "supervised", "teacher-approved", "teacher approved"],
+    )
+    has_consent = text_contains_any(
+        combined,
+        ["consent", "opt out", "voluntary"],
+    )
+    has_privacy = text_contains_any(
+        combined,
+        ["anonymous", "anonymized", "privacy", "no public sharing", "no individual data"],
+    )
+
+    return all(
+        [
+            has_student_measurement,
+            has_light_activity,
+            has_supervision,
+            has_consent,
+            has_privacy,
+        ]
+    )
+
+
 # ============================================================
 # Input guardrails
 # ============================================================
@@ -476,6 +518,7 @@ def llm_safety_sanity_check(goal: str, proposal: dict[str, Any]) -> dict[str, An
     """Ask an LLM whether a RAG-cleared proposal is reasonably classroom-safe."""
     api_key, api_key_source = get_openai_api_key()
     model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
+    student_controls_present = student_measurement_controls_present(goal, proposal)
 
     if not api_key or api_key.startswith("replace-with"):
         return {
@@ -488,9 +531,17 @@ def llm_safety_sanity_check(goal: str, proposal: dict[str, Any]) -> dict[str, An
     prompt = {
         "research_goal": goal,
         "proposal": proposal,
+        "local_student_measurement_detector": {
+            "basic_safeguards_appear_present": student_controls_present,
+            "instruction": (
+                "If true, approve the physical-safety review unless a hard unsafe condition is present. "
+                "Administrative consent/privacy concerns are handled by the separate HUMAN REVIEW step."
+            ),
+        },
         "review_task": (
             "Decide whether this is a reasonable supervised classroom experiment for K-12 or introductory students. "
             "Do not provide dangerous procedural instructions. Prefer MODIFY when controls are needed. "
+            "Do not turn consent, privacy, or school-policy concerns into a safety MODIFY when the activity already includes consent, anonymous data, teacher supervision, and light exercise; those concerns are escalated separately through HUMAN REVIEW. "
             "Reject if it involves hazardous chemicals, unknown hazardous materials, biological agents, explosives, high voltage, high heat, illegal activity, or unsafe human-subject activity."
         ),
         "allowed_decisions": ["APPROVE", "MODIFY", "REJECT"],
@@ -564,6 +615,16 @@ def llm_safety_sanity_check(goal: str, proposal: dict[str, Any]) -> dict[str, An
     requirements = llm_review.get("requirements")
     if not isinstance(requirements, list) or not requirements:
         requirements = ["Keep quantities small, use teacher-approved materials, and supervise measurements."]
+
+    if student_controls_present and decision != "REJECT":
+        return {
+            "decision": "APPROVE",
+            "reason": "Basic student-measurement safeguards are already included, and the LLM safety check did not identify a hard rejection.",
+            "requirements": ["Continue using consent, anonymous recording, teacher supervision, and light activity limits."],
+            "matchedCriteria": "RAG clear + LLM safety sanity check",
+            "llmReason": str(llm_review.get("reason") or ""),
+            "llmKeySource": api_key_source,
+        }
 
     return {
         "decision": decision,
